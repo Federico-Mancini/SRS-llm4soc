@@ -1,0 +1,10 @@
+{"time":1642213957,"name":"Wazuh: ClamAV database update","ip":"172.17.131.81","host":"mail","short":"W-Sys-Cav","time_label":"false_positive","event_label":"-"}
+{"time":1642213962,"name":"Wazuh: ClamAV database update","ip":"172.17.131.81","host":"mail","short":"W-Sys-Cav","time_label":"false_positive","event_label":"-"}
+{"time":1642508361,"name":"Wazuh: Multiple web server 400 error codes from same source ip.","ip":"10.35.35.206","host":"intranet_server","short":"W-All-Mul3","time_label":"dirb","event_label":"dirb"}
+{"time":1642508361,"name":"Wazuh: Web server 400 error code.","ip":"10.35.35.206","host":"intranet_server","short":"W-Acc-400","time_label":"dirb","event_label":"dirb"}
+{"time":1642509509,"name":"AMiner: High entropy in Apache Access request.","ip":"10.35.35.206","host":"intranet_server","short":"A-Acc-Ent2","time_label":"webshell","event_label":"webshell_cmd"}
+{"time":1642213952,"name":"Wazuh: ClamAV database update","ip":"192.168.128.170","host":"jonesmorgan_mail","short":"W-Sys-Cav","time_label":"false_positive","event_label":"-"}
+{"time":1642213967,"name":"Wazuh: ClamAV database update","ip":"172.17.131.81","host":"mail","short":"W-Sys-Cav","time_label":"false_positive","event_label":"-"}
+{"time":1642509469,"name":"AMiner: New event type.","ip":"10.35.35.206","host":"intranet_server","short":"A-All-Evt","time_label":"dirb","event_label":"dirb"}
+{"time":1642509505,"name":"AMiner: High entropy in Apache Access request.","ip":"10.35.35.206","host":"intranet_server","short":"A-Acc-Ent2","time_label":"webshell","event_label":"webshell_cmd"}
+{"time":1642509551,"name":"AMiner: High entropy in Apache Access request.","ip":"10.35.35.206","host":"intranet_server","short":"A-Acc-Ent2","time_label":"cracking","event_label":"webshell_cmd"}
