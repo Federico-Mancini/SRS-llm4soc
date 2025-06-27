@@ -44,4 +44,4 @@ MODEL_NAME = "gemini-2.0-flash-001"
 
 
 # Cluod Run
-CLOUD_RUN_URL = "TODO"  # da inserire dopo averlo deployato la prima volta
+CLOUD_RUN_URL = "https://llm4soc-runner-870222336278.europe-west1.run.app"

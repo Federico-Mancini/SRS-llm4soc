@@ -84,6 +84,30 @@ def build_alert_entry(i, t, c, e) -> dict:
     }
 
 
+def analyze_single_alert(alert) -> dict:
+    initialize()
+
+    prompt = build_prompt(alert)
+
+    try:
+        response = model.generate_content(prompt, generation_config=gen_conf)
+        text = response.text.strip()
+
+        if "{" in text and "}" in text:
+            text = text[text.find("{") : text.rfind("}") + 1]  # pulizia testo Gemini
+
+        try:
+            parsed = json.loads(text)
+            return build_alert_entry(0, alert.get("time", "n/a"), parsed.get("class", "error"), parsed.get("explanation", "Nessuna spiegazione"))
+
+        except json.JSONDecodeError:
+            return build_alert_entry(0, alert.get("time", "n/a"), "error", f"Output non valido: {text}")
+        
+    except Exception as e:
+        return build_alert_entry(0, alert.get("time", "n/a"), "error", str(e))
+
+
+# Funzione interna (privata), usata da analyze_batch_async
 async def analyze_alert_async(i, alert, semaphore, model, gen_conf) -> dict:
     prompt = build_prompt(alert)
 

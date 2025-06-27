@@ -1,3 +1,6 @@
 /alert_classification
 /batch_classification
 /chat_vertexai.py
+/fast_api/app_OLD.py
+/fast_api/analyze_batch_OLD.py
+/fast_api/utils/vertexai_config_OLD.py

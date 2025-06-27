@@ -1,7 +1,7 @@
 import logging
 
 from fastapi import FastAPI, Request
-from analyze_batch import analyze_batch_async
+from analyze_batch import analyze_single_alert, analyze_batch_async
 
 
 logging.basicConfig(level=logging.INFO)
@@ -10,15 +10,24 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def startup_event():
-    logging.info("Runner avviato e pronto.")
+    logging.info("Cloud Run - runner avviato e pronto.")
 
 
+# --- Endpoints ---------------------------------
 @app.get("/")
-def health():
+def check_status():
     return {"status": "running"}
 
 
-@app.post("/run")
+@app.post("/run-alert")
+async def run_alert(req: Request):
+    data = await req.json()
+    alert = data["alert"]
+
+    return await analyze_single_alert(alert)    # restituzione diretta di un json
+
+
+@app.post("/run-batch")
 async def run_batch(req: Request):
     data = await req.json()
     batch_file = data["batch_file"]
@@ -27,4 +36,4 @@ async def run_batch(req: Request):
 
     await analyze_batch_async(batch_file)
     
-    return {"status": "ok", "batch": batch_file}
+    return {"batch": batch_file}

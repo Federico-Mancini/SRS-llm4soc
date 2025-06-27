@@ -1,15 +1,15 @@
-import os ,json
-import shutil, logging, requests
+import os ,json, logging, requests, httpx
 
 from datetime import datetime
 from google.cloud import storage
+
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query
-from fastapi.response import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+from utils.auth_utils import get_auth_header, call_runner
 from utils.gcs_utils import download_from_gcs, upload_config
-from utils.config import RESULTS_ENDPOINT, ANALYZE_ENDPOINT, UPLOAD_ENDPOINT, CHAT_ENDPOINT, ANALYZE_ALL_ENDPOINT,\
-    N_BATCHES, RESULT_FILENAME, RESULT_PATH, ALERTS_PATH, ASSET_BUCKET_NAME, GCS_BATCH_DIR, CLOUD_RUN_URL
+from utils.config import RESULTS_ENDPOINT, CHAT_ENDPOINT, ANALYZE_ALL_ENDPOINT,\
+    N_BATCHES, RESULT_FILENAME, RESULT_PATH, ASSET_BUCKET_NAME, GCS_BATCH_DIR, CLOUD_RUN_URL
 
 
 # --- Logging -----------------------------------
@@ -27,20 +27,38 @@ logging.basicConfig(
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: in produzione mettere solo il dominio frontend
+    allow_origins=["*"],    # TODO: prima di pushare in produzione, da sostituire con URL di API in frontend (compito Samu)
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+@app.on_event("startup")
+async def startup_event():
+    logging.info("Fast API - API avviata e pronta.")
 
 
 # --- Endpoints ---------------------------------
 @app.get("/")
 def read_root():
-    return {"message": "API LLM4SOC attiva!"}
+    return {"status": "running"}
 
 
-# Endoint 1.0 - CHECKED
+# Check di stato di API e runner
+@app.get("/check-status")
+async def check_status():
+    try:
+        data = await call_runner("GET", CLOUD_RUN_URL)
+        status = data.get("status", "unknown")
+
+    except Exception as e:
+        logging.error(f"[app|check_status] Errore: {e}")
+        status = f"errore: {str(e)}"
+
+    return {"API": "running", "runner": status}
+
+
+# Visualizzazione alert classificati
 @app.get(RESULTS_ENDPOINT)
 def get_results():
     download_from_gcs(RESULT_FILENAME)     # download risultati da GCS
@@ -64,91 +82,68 @@ def get_results():
         raise HTTPException(status_code=500, detail=f"Errore nella lettura del file '{RESULT_FILENAME}': {str(e)}")
 
 
-# Endpoint 1.0 - TODO: ritrasmettere la richiesta al Cloud Run server
-@app.post(ANALYZE_ENDPOINT)
-async def analyze_alerts():
-    if not os.path.exists(ALERTS_PATH):
-        logging.warning("POST /analyze | File da analizzare non trovato")
-        raise HTTPException(status_code=404, detail="File da analizzare non trovato")
-    
-    try:
-        results = analyze_batch(ALERTS_PATH)
-        logging.info(f"POST /analyze | {len(results)} alert analizzati")
-
-        return JSONResponse(content={
-            "message": f"Analisi completata. Risultati visibili anche a '{RESULTS_ENDPOINT}'",
-            "num_alerts": len(results),
-            "results": results
-        })
-    
-    except Exception as e:
-        logging.error(f"POST /analyze | Errore in analisi batch: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Errore nell'analisi degli alert: {str(e)}")
-
-
-# Endpoint 1.0 - OBSOLETE (comunque può ancora essere usato per memorizzare localmente a Fast API (VM) il dataset)
-@app.post(UPLOAD_ENDPOINT)
-async def upload_alerts(file: UploadFile = File(...)):
-    # Verifica estensione file
-    if not file.filename.endswith((".csv", ".json", ".jsonl")):
-        logging.warning(f"POST /upload | File non supportato: {file.filename}")
-        raise HTTPException(status_code=400, detail="Il file da analizzare deve essere in formato CSV, JSON o JSONL")
-
-    try:
-        with open(ALERTS_PATH, "wb") as f:
-            shutil.copyfileobj(file.file, f)    # copia dei byte del file ricevuto in locale
-        logging.info(f"POST /upload | File caricato: {file.filename}")
-        return {"filename": file.filename, "message": "File caricato con successo"}
-
-    except Exception as e:
-        logging.error(f"POST /upload | Errore in salvataggio: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Errore nel salvataggio del file: {str(e)}")
-
-
-# Endpoint 1.0 - CHECKED (TODO: controllare formato di risposta e magari renderla più discorsiva)
+# (TODO: controllare formato di risposta e magari renderla più discorsiva)
 @app.post(CHAT_ENDPOINT)
 async def chat(request: Request):
     try:
-        alert_text = await request.body().decode("utf-8")
-        result = analyze_alert(alert_text)
-        logging.info(f"POST /chat | Alert analizzato")
-        return {"explanation": result.explanation}
-    
+        alert_json = await request.json()
+        result = await call_runner(
+            method="POST",
+            url=f"{CLOUD_RUN_URL}/run-alert",
+            json={"alert": alert_json}
+        )
+
+        logging.info(f"Alert inviato a Cloud Run")
+
     except Exception as e:
-        logging.error(f"POST /chat | Errore in analisi alert: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Errore nell'analisi dell'alert: {str(e)}")
+        logging.error(f"[app|chat] Errore in invio alert: {e}")
+        return {"explanation": f"Errore sconosciuto. Ulteriori info nei log locali al server Fast API"}
+    
+    return {"explanation": result.explanation}
 
 
-# Endpoint 2.0 (riceve file con dataset, lo divide in N batch per farli poi eseguire in parallelo dal server Cloud Run)
+
+# Endpoint che riceve file con dataset, lo divide in N batch per farli poi eseguire in parallelo dal server Cloud Run
 @app.post(ANALYZE_ALL_ENDPOINT)
-async def analyze_all(file: UploadFile = File(...), n_batches: int = Query(..., gt=0)):
+async def analyze_all(file: UploadFile = File(...), n_batches: int = Query(N_BATCHES, gt=0)):
+   # Caricamento variabili d'ambiente su GCS
+    upload_config(n_batches)
 
     # Elaborazione dati
     content = await file.read()
     lines = content.decode().splitlines()
     total = len(lines)
-    chunk_size = total // N_BATCHES
+    chunk_size = total // n_batches
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     # Connessione al bucket
     bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
 
-    # Caricamento variabili d'ambiente su GCS
-    upload_config(n_batches)
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for i in range(n_batches):
+            # Suddivisione file in N batch
+            start = i * chunk_size
+            end = (i + 1) * chunk_size if i < n_batches - 1 else total
+            batch_lines = lines[start:end]
+            #batch_lines = lines[i*chunk_size:(i+1)*chunk_size] if i < n_batches - 1 else lines[i*chunk_size:]      #(versione compatta)
+            
+            # Salvataggio file batch in GCS
+            batch_path = f"{GCS_BATCH_DIR}/{run_id}-batch-{i}.jsonl"
+            blob = bucket.blob(batch_path)
+            blob.upload_from_string("\n".join(batch_lines))
 
-    for i in range(N_BATCHES):
-        # Suddivisione file in N batch
-        start = i * chunk_size
-        end = (i + 1) * chunk_size if i < N_BATCHES - 1 else total
-        batch_lines = lines[start:end]
-        #batch_lines = lines[i*chunk_size:(i+1)*chunk_size] if i < N_BATCHES - 1 else lines[i*chunk_size:]      #(versione compatta)
-        
-        # Salvataggio file batch in GCS
-        batch_path = f"{GCS_BATCH_DIR}/{run_id}-batch-{i}.jsonl"
-        blob = bucket.blob(batch_path)
-        blob.upload_from_string("\n".join(batch_lines))
+            # Invia richiesta HTTP a Cloud Run per analizzare l'i-esimo batch
+            try:
+                await call_runner(
+                    method="POST",
+                    url=f"{CLOUD_RUN_URL}/run-batch",
+                    json={"batch_file": batch_path}
+                )
 
-        # Invia richiesta HTTP a Cloud Run per analizzare l'i-esimo batch
-        requests.post(CLOUD_RUN_URL, json={"batch_file": batch_path})
+                logging.info(f"Batch {i} inviato a Cloud Run")
 
-    return {"message": f"{N_BATCHES} batch lanciati", "run_id": run_id}
+            except Exception as e:
+                logging.error(f"[app|analyze_all] Errore in invio batch {i}: {e}")
+                return {"message": f"Errore in invio batch {i}. Ulteriori info nei log locali al server Fast API", "run_id": run_id}
+
+    return {"message": f"{n_batches} batch inviati", "run_id": run_id}
