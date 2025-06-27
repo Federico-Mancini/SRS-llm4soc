@@ -26,6 +26,7 @@ def initialize():
 
         # Estrazione di variabili d'ambiente (condivise su GCS)
         conf = gcs.download_config()
+        print(f"Config ricevuta: {conf}")
         ASSET_BUCKET_NAME = conf["asset_bucket_name"]
         MAX_CONCURRENT_REQUESTS = conf["max_concurrent_requests"]
 
