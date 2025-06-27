@@ -100,7 +100,7 @@ async def chat(request: Request):
         logging.error(f"[app|chat] Errore in invio alert: {e}")
         return {"explanation": f"Errore sconosciuto. Ulteriori info nei log locali al server Fast API"}
     
-    return {"explanation": result.explanation}
+    return {"explanation": result["explanation"]}
 
 
 

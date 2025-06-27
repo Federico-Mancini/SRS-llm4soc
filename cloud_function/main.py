@@ -47,10 +47,3 @@ def merge_handler(event, context):
     # Rimozione singoli file 'result' (non più necessari)
     for blob in blobs:
         blob.delete()
-
-'''
-Comando per il deploy di "merge_handler" come Cloud Function da invocare alla creazione di un file nella cartella "results" del bucket:
-(Nota: da eseguire su host - copia e incolla funzione in un nuovo python, dedicato solo a questa funzione. Poi esegui il comando nella cartella contenente il file)
-
-gcloud functions deploy merge_handler --runtime python311 --trigger-resource main-asset-storage --trigger-event google.storage.object.finalize --entry-point merge_handler --region europe-west1
-'''
