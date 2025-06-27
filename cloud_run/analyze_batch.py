@@ -6,24 +6,34 @@ from google.cloud import storage
 from utils.cache_utils import alert_hash, load_alert_cache, save_alert_cache
 
 
-# Vertex AI configuration
-vxc.init()
-model = vxc.get_model()
-gen_conf = vxc.get_generation_config()
-
-# Estrazione di variabili d'ambiente (condivise su GCS)
-conf = gcs.download_config()
-ASSET_BUCKET_NAME, GCS_RESULT_DIR, MAX_CONCURRENT_REQUESTS = (
-    conf.asset_bucket_name,
-    conf.gcs_result_dir,
-    conf.max_concurrent_requests
-)
-
-# Connessione al bucket
-bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
+model = None
+gen_conf = None
+bucket = None
+MAX_CONCURRENT_REQUESTS = 5
+GCS_RESULT_DIR = ""
 
 
 # -- Funzioni -------------------------------------------------
+
+def initialize():
+    global model, gen_conf, bucket, MAX_CONCURRENT_REQUESTS, GCS_RESULT_DIR
+
+    if model is None or gen_conf is None or bucket is None:
+        # Vertex AI configuration
+        vxc.init()
+        model = vxc.get_model()
+        gen_conf = vxc.get_generation_config()
+
+        # Estrazione di variabili d'ambiente (condivise su GCS)
+        conf = gcs.download_config()
+        ASSET_BUCKET_NAME, GCS_RESULT_DIR, MAX_CONCURRENT_REQUESTS = (
+            conf.asset_bucket_name,
+            conf.gcs_result_dir,
+            conf.max_concurrent_requests
+        )
+
+        # Connessione al bucket
+        bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
 
 
 def build_prompt(alert) -> str:
@@ -97,6 +107,9 @@ async def analyze_alert_async(i, alert, semaphore) -> dict:
             return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
 
 async def analyze_batch_async(batch_path: str) -> list:
+    # Inizializzazione (l'IF al suo interno previene inizializzazioni ripetute)
+    initialize()
+
     blob = bucket.blob(batch_path)
 
     # Lettura del file batch '.jsonl'
