@@ -4,10 +4,11 @@ options:
 steps:
 - name: 'gcr.io/cloud-builders/gcloud'
   dir: 'cloud_function'
-  args: ['functions', 'deploy', 'llm4soc-merge-handler-function',
+  args: ['functions', 'deploy', 'llm4soc-merge-handler',
           '--runtime', 'python311',
           '--trigger-event', 'google.storage.object.finalize',
           '--trigger-resource', 'main-asset-storage',
           '--entry-point', 'merge_handler',
           '--region', 'europe-west1',
           '--source', '.']
+
