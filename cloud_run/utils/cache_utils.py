@@ -17,10 +17,8 @@ def initialize():
     if bucket is None:
         # Estrazione di variabili d'ambiente (condivise su GCS)
         conf = gcs.download_config()
-        ASSET_BUCKET_NAME, GCS_CACHE_DIR = (
-            conf.asset_bucket_name,
-            conf.gcs_cache_dir
-        )
+        ASSET_BUCKET_NAME = conf["asset_bucket_name"]
+        GCS_CACHE_DIR = conf["gcs_cache_dir"]
 
         # Connessione al bucket
         bucket = storage.Client().bucket(ASSET_BUCKET_NAME)

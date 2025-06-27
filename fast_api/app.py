@@ -1,4 +1,4 @@
-import os ,json, logging, requests, httpx
+import os ,json, logging
 
 from datetime import datetime
 from google.cloud import storage
@@ -6,7 +6,7 @@ from google.cloud import storage
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from utils.auth_utils import get_auth_header, call_runner
+from utils.auth_utils import call_runner
 from utils.gcs_utils import download_from_gcs, upload_config
 from utils.config import RESULTS_ENDPOINT, CHAT_ENDPOINT, ANALYZE_ALL_ENDPOINT,\
     N_BATCHES, RESULT_FILENAME, RESULT_PATH, ASSET_BUCKET_NAME, GCS_BATCH_DIR, CLOUD_RUN_URL
@@ -119,31 +119,30 @@ async def analyze_all(file: UploadFile = File(...), n_batches: int = Query(N_BAT
     # Connessione al bucket
     bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        for i in range(n_batches):
-            # Suddivisione file in N batch
-            start = i * chunk_size
-            end = (i + 1) * chunk_size if i < n_batches - 1 else total
-            batch_lines = lines[start:end]
-            #batch_lines = lines[i*chunk_size:(i+1)*chunk_size] if i < n_batches - 1 else lines[i*chunk_size:]      #(versione compatta)
-            
-            # Salvataggio file batch in GCS
-            batch_path = f"{GCS_BATCH_DIR}/{run_id}-batch-{i}.jsonl"
-            blob = bucket.blob(batch_path)
-            blob.upload_from_string("\n".join(batch_lines))
+    for i in range(n_batches):
+        # Suddivisione file in N batch
+        start = i * chunk_size
+        end = (i + 1) * chunk_size if i < n_batches - 1 else total
+        batch_lines = lines[start:end]
+        #batch_lines = lines[i*chunk_size:(i+1)*chunk_size] if i < n_batches - 1 else lines[i*chunk_size:]      #(versione compatta)
+        
+        # Salvataggio file batch in GCS
+        batch_path = f"{GCS_BATCH_DIR}/{run_id}-batch-{i}.jsonl"
+        blob = bucket.blob(batch_path)
+        blob.upload_from_string("\n".join(batch_lines))
 
-            # Invia richiesta HTTP a Cloud Run per analizzare l'i-esimo batch
-            try:
-                await call_runner(
-                    method="POST",
-                    url=f"{CLOUD_RUN_URL}/run-batch",
-                    json={"batch_file": batch_path}
-                )
+        # Invia richiesta HTTP a Cloud Run per analizzare l'i-esimo batch
+        try:
+            await call_runner(
+                method="POST",
+                url=f"{CLOUD_RUN_URL}/run-batch",
+                json={"batch_file": batch_path}
+            )
 
-                logging.info(f"Batch {i} inviato a Cloud Run")
+            logging.info(f"Batch {i} inviato a Cloud Run")
 
-            except Exception as e:
-                logging.error(f"[app|analyze_all] Errore in invio batch {i}: {e}")
-                return {"message": f"Errore in invio batch {i}. Ulteriori info nei log locali al server Fast API", "run_id": run_id}
+        except Exception as e:
+            logging.error(f"[app|analyze_all] Errore in invio batch {i}: {e}")
+            return {"message": f"Errore in invio batch {i}. Ulteriori info nei log locali al server Fast API", "run_id": run_id}
 
     return {"message": f"{n_batches} batch inviati", "run_id": run_id}

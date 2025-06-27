@@ -26,10 +26,8 @@ def initialize():
 
         # Estrazione di variabili d'ambiente (condivise su GCS)
         conf = gcs.download_config()
-        ASSET_BUCKET_NAME, MAX_CONCURRENT_REQUESTS = (
-            conf.asset_bucket_name,
-            conf.max_concurrent_requests
-        )
+        ASSET_BUCKET_NAME = conf["asset_bucket_name"]
+        MAX_CONCURRENT_REQUESTS = conf["max_concurrent_requests"]
 
         # Connessione al bucket
         bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
