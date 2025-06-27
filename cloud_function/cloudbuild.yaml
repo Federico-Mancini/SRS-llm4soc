@@ -3,7 +3,6 @@ options:
 
 steps:
 - name: 'gcr.io/cloud-builders/gcloud'
-  dir: 'cloud-function'
   args: ['functions', 'deploy', 'llm4soc-merge-handler-function',
           '--runtime', 'python311',
           '--trigger-event', 'google.storage.object.finalize',

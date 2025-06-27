@@ -4,7 +4,6 @@ options:
 steps:
 - name: 'gcr.io/cloud-builders/docker'
   args: ['build', '-t', 'europe-west1-docker.pkg.dev/gruppo-4-456912/llm4soc-runner-repo/llm4soc-runner', '.']
-  dir: 'cloud_run'
 
 - name: 'gcr.io/cloud-builders/docker'
   args: ['push', 'europe-west1-docker.pkg.dev/gruppo-4-456912/llm4soc-runner-repo/llm4soc-runner']
