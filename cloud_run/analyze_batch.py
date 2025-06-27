@@ -14,6 +14,7 @@ MAX_CONCURRENT_REQUESTS = 5
 
 # -- Funzioni -------------------------------------------------
 
+# Inizializzazione var. d'ambiente (l'IF previene inizializzazioni ripetute)
 def initialize():
     global model, gen_conf, bucket, MAX_CONCURRENT_REQUESTS
 
@@ -105,7 +106,6 @@ async def analyze_alert_async(i, alert, semaphore, model, gen_conf) -> dict:
             return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
 
 async def analyze_batch_async(batch_path: str) -> list:
-    # Inizializzazione (l'IF al suo interno previene inizializzazioni ripetute)
     initialize()
 
     blob = bucket.blob(batch_path)

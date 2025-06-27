@@ -1,22 +1,31 @@
 import json, hashlib
+import utils.gcs_utils as gcs
 
 from google.cloud import storage
-from utils.gcs_utils import download_config
 
 
-# Estrazione di variabili d'ambiente (condivise su GCS)
-conf = download_config()
-ASSET_BUCKET_NAME, GCS_CACHE_DIR = (
-    conf.asset_bucket_name,
-    conf.gcs_cache_dir
-)
-
-# Connessione al bucket
-bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
-
+bucket = None
+GCS_CACHE_DIR = ""
 
 
 # -- Funzioni -------------------------------------------------
+
+# Inizializzazione var. d'ambiente (l'IF previene inizializzazioni ripetute)
+def initialize():
+    global bucket, GCS_CACHE_DIR
+
+    if bucket is None:
+        # Estrazione di variabili d'ambiente (condivise su GCS)
+        conf = gcs.download_config()
+        ASSET_BUCKET_NAME, GCS_CACHE_DIR = (
+            conf.asset_bucket_name,
+            conf.gcs_cache_dir
+        )
+
+        # Connessione al bucket
+        bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
+
+
 
 # Compute hash from alert
 def alert_hash(alert: dict) -> str:
@@ -26,6 +35,8 @@ def alert_hash(alert: dict) -> str:
 
 # Salva cache (un file di cache per ogni alert)
 def save_alert_cache(data: dict):
+    initialize()
+
     h = alert_hash(data)    # calcolo dell'impronta dell'alert
     blob = bucket.blob(f"{GCS_CACHE_DIR}/{h}.json")
 
@@ -36,6 +47,8 @@ def save_alert_cache(data: dict):
 
 # Leggi cache
 def load_alert_cache(h: str) -> dict | None:
+    initialize()
+    
     blob = bucket.blob(f"{GCS_CACHE_DIR}/{h}.json")
     
     if blob.exists():
