@@ -10,13 +10,12 @@ model = None
 gen_conf = None
 bucket = None
 MAX_CONCURRENT_REQUESTS = 5
-GCS_RESULT_DIR = ""
 
 
 # -- Funzioni -------------------------------------------------
 
 def initialize():
-    global model, gen_conf, bucket, MAX_CONCURRENT_REQUESTS, GCS_RESULT_DIR
+    global model, gen_conf, bucket, MAX_CONCURRENT_REQUESTS
 
     if model is None or gen_conf is None or bucket is None:
         # Vertex AI configuration
@@ -26,9 +25,8 @@ def initialize():
 
         # Estrazione di variabili d'ambiente (condivise su GCS)
         conf = gcs.download_config()
-        ASSET_BUCKET_NAME, GCS_RESULT_DIR, MAX_CONCURRENT_REQUESTS = (
+        ASSET_BUCKET_NAME, MAX_CONCURRENT_REQUESTS = (
             conf.asset_bucket_name,
-            conf.gcs_result_dir,
             conf.max_concurrent_requests
         )
 
@@ -85,7 +83,7 @@ def build_alert_entry(i, t, c, e) -> dict:
     }
 
 
-async def analyze_alert_async(i, alert, semaphore) -> dict:
+async def analyze_alert_async(i, alert, semaphore, model, gen_conf) -> dict:
     prompt = build_prompt(alert)
 
     async with semaphore:
@@ -127,7 +125,7 @@ async def analyze_batch_async(batch_path: str) -> list:
             print(f"Cache hit for alert {i}")
             result = cached.copy()
         else:
-            result = await analyze_alert_async(i, alert, semaphore) # classificazione alert
+            result = await analyze_alert_async(i, alert, semaphore, model, gen_conf) # classificazione alert
             
             # Salvataggio cache (dati rilevanti di alert in file remoto dedicato)
             save_alert_cache({
