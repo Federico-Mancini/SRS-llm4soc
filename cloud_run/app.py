@@ -1,7 +1,8 @@
 import logging
 
 from fastapi import FastAPI, Request
-from analyze_batch import analyze_batch_async
+#from analyze_batch import analyze_batch_async
+from mytest import mytest
 
 
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +26,6 @@ async def run_batch(req: Request):
     
     print(f"Ricevuto batch: {batch_file}")
 
-    await analyze_batch_async(batch_file)
+    #await analyze_batch_async(batch_file)
     
     return {"status": "ok", "batch": batch_file}
