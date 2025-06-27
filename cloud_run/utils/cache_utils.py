@@ -13,7 +13,7 @@ GCS_CACHE_DIR = ""
 
 # Inizializzazione var. d'ambiente
 def initialize():
-    global bucket, GCS_CACHE_DIR
+    global initialized, bucket, GCS_CACHE_DIR
 
     if not initialized:
         # Estrazione di variabili d'ambiente (condivise su GCS)

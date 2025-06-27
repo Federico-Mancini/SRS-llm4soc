@@ -17,7 +17,7 @@ MAX_CONCURRENT_REQUESTS = 5
 
 # Inizializzazione var. d'ambiente
 def initialize():
-    global model, gen_conf, bucket, MAX_CONCURRENT_REQUESTS
+    global initialized, model, gen_conf, bucket, MAX_CONCURRENT_REQUESTS
 
     if not initialized:
         # Vertex AI configuration

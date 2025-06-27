@@ -14,11 +14,15 @@ GCS_RESULT_DIR = ""
 
 # Inizializzazione var. d'ambiente
 def initialize():
-    global N_BATCHES, RESULT_FILENAME, GCS_RESULT_DIR
+    global initialized, N_BATCHES, RESULT_FILENAME, GCS_RESULT_DIR
 
     if not initialized:
         # Estrazione di variabili d'ambiente (condivise su GCS)
         conf = gcs.download_config()
+
+        if not conf or not all(k in conf for k in ("n_batches", "result_filename", "gcs_result_dir")):
+            raise ValueError("[main|initialize] Configurazione non valida. Impossibile completare il merge")
+
         N_BATCHES = conf["n_batches"]
         RESULT_FILENAME = conf["result_filename"]
         GCS_RESULT_DIR = conf["gcs_result_dir"]
