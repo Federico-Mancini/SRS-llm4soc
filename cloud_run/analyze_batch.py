@@ -6,6 +6,7 @@ from google.cloud import storage
 from utils.cache_utils import alert_hash, load_alert_cache, save_alert_cache
 
 
+initialized = False
 model = None
 gen_conf = None
 bucket = None
@@ -14,11 +15,11 @@ MAX_CONCURRENT_REQUESTS = 5
 
 # -- Funzioni -------------------------------------------------
 
-# Inizializzazione var. d'ambiente (l'IF previene inizializzazioni ripetute)
+# Inizializzazione var. d'ambiente
 def initialize():
     global model, gen_conf, bucket, MAX_CONCURRENT_REQUESTS
 
-    if model is None or gen_conf is None or bucket is None:
+    if not initialized:
         # Vertex AI configuration
         vxc.init()
         model = vxc.get_model()
@@ -32,6 +33,8 @@ def initialize():
 
         # Connessione al bucket
         bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
+
+        initialized = True
 
 
 def build_prompt(alert) -> str:

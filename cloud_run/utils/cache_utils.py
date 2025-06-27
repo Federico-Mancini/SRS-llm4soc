@@ -4,17 +4,18 @@ import utils.gcs_utils as gcs
 from google.cloud import storage
 
 
+initialized = False
 bucket = None
 GCS_CACHE_DIR = ""
 
 
 # -- Funzioni -------------------------------------------------
 
-# Inizializzazione var. d'ambiente (l'IF previene inizializzazioni ripetute)
+# Inizializzazione var. d'ambiente
 def initialize():
     global bucket, GCS_CACHE_DIR
 
-    if bucket is None:
+    if not initialized:
         # Estrazione di variabili d'ambiente (condivise su GCS)
         conf = gcs.download_config()
         ASSET_BUCKET_NAME = conf["asset_bucket_name"]
@@ -22,6 +23,8 @@ def initialize():
 
         # Connessione al bucket
         bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
+
+        initialized = True
 
 
 

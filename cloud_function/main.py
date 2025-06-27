@@ -1,23 +1,34 @@
-import os, json
+import json
 import gcs_utils as gcs
 
 from google.cloud import storage
 
 
-# Estrazione di variabili d'ambiente (condivise su GCS)
-conf = gcs.download_config()
-N_BATCHES, RESULT_FILENAME, GCS_RESULT_DIR = (
-    conf.n_batches,
-    conf.result_filename,
-    conf.gcs_result_dir
-)
+initialized = False
+N_BATCHES = 3
+RESULT_FILENAME = ""
+GCS_RESULT_DIR = ""
 
 
 # -- Funzioni -------------------------------------------------
 
+# Inizializzazione var. d'ambiente
+def initialize():
+    global N_BATCHES, RESULT_FILENAME, GCS_RESULT_DIR
+
+    if not initialized:
+        # Estrazione di variabili d'ambiente (condivise su GCS)
+        conf = gcs.download_config()
+        N_BATCHES = conf["n_batches"]
+        RESULT_FILENAME = conf["result_filename"]
+        GCS_RESULT_DIR = conf["gcs_result_dir"]
+
+        initialized = True
+
+
 # Merge single result files in one final 'result.json' (eseguita come Cloud Function al trigger di GCS, cioè ogni volta che un file 'result' viene creato)
 def merge_handler(event, context):
-    n_batches = int(os.getenv("N_BATCHES", N_BATCHES))
+    initialize()
 
     # Connessione al bucket
     bucket_name = event['bucket']                   # estrazione nome bucket da chi ha generato l'evento trigger
@@ -25,8 +36,8 @@ def merge_handler(event, context):
     blobs = list(bucket.list_blobs(prefix=f"{GCS_RESULT_DIR}/result-"))
 
     # Controllo presenza di tutti i file attesi
-    if len(blobs) < n_batches:
-        print(f"Solo {len(blobs)}/{n_batches} file 'result' presenti. In attesa di altri...")
+    if len(blobs) < N_BATCHES:
+        print(f"Solo {len(blobs)}/{N_BATCHES} file 'result' presenti. In attesa di altri...")
         return
 
     # Unione dei file 'result'
