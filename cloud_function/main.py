@@ -12,7 +12,7 @@ GCS_RESULT_DIR = ""
 
 # provvisorio
 def merge_handler():
-    print("I'm merge handler!")
+    print("I'm merge handler!!")
 
 # # -- Funzioni -------------------------------------------------
 
