@@ -24,7 +24,7 @@ async def run_alert(req: Request):
     data = await req.json()
     alert = data["alert"]
 
-    return await analyze_single_alert(alert)    # restituzione diretta di un json
+    return analyze_single_alert(alert)
 
 
 @app.post("/run-batch")

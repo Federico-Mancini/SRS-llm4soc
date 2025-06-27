@@ -1,7 +1,7 @@
 import os, json
 
 from google.cloud import storage
-from utils.config import ASSET_DIR, RESULT_FILENAME, ASSET_BUCKET_NAME,\
+from utils.config import N_BATCHES, ASSET_DIR, RESULT_FILENAME, ASSET_BUCKET_NAME,\
     GCS_CACHE_DIR, GCS_RESULT_DIR, MAX_CONCURRENT_REQUESTS, MAX_CACHE_AGE
 
 
@@ -43,7 +43,7 @@ def upload_to_gcs(folder: str, filename: str):
 
 
 # Upload file with shared configuration constants
-def upload_config(n):
+def upload_config(n: int = N_BATCHES):
     conf_obj = {
         "n_batches": n,
         "result_filename": RESULT_FILENAME,
@@ -56,3 +56,4 @@ def upload_config(n):
 
     blob = storage.Client().bucket(ASSET_BUCKET_NAME).blob("config.json")
     blob.upload_from_string(json.dumps(conf_obj, indent=2))
+

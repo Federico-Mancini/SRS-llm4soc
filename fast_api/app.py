@@ -35,6 +35,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
+    upload_config()    # caricamento variabili d'ambiente su GCS
     logging.info("Fast API - API avviata e pronta.")
 
 
