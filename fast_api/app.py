@@ -8,8 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from utils.auth_utils import call_runner
 from utils.gcs_utils import download_from_gcs, upload_config
-from utils.config import RESULTS_ENDPOINT, CHAT_ENDPOINT, ANALYZE_ALL_ENDPOINT,\
-    N_BATCHES, RESULT_FILENAME, RESULT_PATH, ASSET_BUCKET_NAME, GCS_BATCH_DIR, CLOUD_RUN_URL
+from utils.config import N_BATCHES, RESULT_FILENAME, RESULT_PATH, ASSET_BUCKET_NAME, GCS_BATCH_DIR, CLOUD_RUN_URL
 
 
 # --- Logging -----------------------------------
@@ -60,7 +59,7 @@ async def check_status():
 
 
 # Visualizzazione alert classificati
-@app.get(RESULTS_ENDPOINT)
+@app.get("/results")
 def get_results():
     download_from_gcs(RESULT_FILENAME)     # download risultati da GCS
     
@@ -84,7 +83,7 @@ def get_results():
 
 
 # (TODO: controllare formato di risposta e magari renderla più discorsiva)
-@app.post(CHAT_ENDPOINT)
+@app.post("/chat")
 async def chat(request: Request):
     try:
         alert_json = await request.json()
@@ -105,7 +104,7 @@ async def chat(request: Request):
 
 
 # Endpoint che riceve file con dataset, lo divide in N batch per farli poi eseguire in parallelo dal server Cloud Run
-@app.post(ANALYZE_ALL_ENDPOINT)
+@app.post("/analyze-all")
 async def analyze_all(file: UploadFile = File(...), n_batches: int = Query(N_BATCHES, gt=0)):
    # Caricamento variabili d'ambiente su GCS
     upload_config(n_batches)

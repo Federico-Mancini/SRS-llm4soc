@@ -1,31 +1,8 @@
-import json, hashlib
-import utils.gcs_utils as gcs
-
-from google.cloud import storage
+import json, time, hashlib
+from utils.resource_manager import ResourceManager
 
 
-initialized = False
-bucket = None
-GCS_CACHE_DIR = ""
-
-
-# -- Funzioni -------------------------------------------------
-
-# Inizializzazione var. d'ambiente
-def initialize():
-    global initialized, bucket, GCS_CACHE_DIR
-
-    if not initialized:
-        # Estrazione di variabili d'ambiente (condivise su GCS)
-        conf = gcs.download_config()
-        ASSET_BUCKET_NAME = conf["asset_bucket_name"]
-        GCS_CACHE_DIR = conf["gcs_cache_dir"]
-
-        # Connessione al bucket
-        bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
-
-        initialized = True
-
+res = ResourceManager()
 
 
 # Compute hash from alert
@@ -35,24 +12,48 @@ def alert_hash(alert: dict) -> str:
 
 
 # Salva cache (un file di cache per ogni alert)
-def save_alert_cache(data: dict):
-    initialize()
+def upload_alert_cache(data: dict):
+    res.initialize()
 
     h = alert_hash(data)    # calcolo dell'impronta dell'alert
-    blob = bucket.blob(f"{GCS_CACHE_DIR}/{h}.json")
+    blob = res.bucket.blob(f"{res.gcs_cache_dir}/{h}.json")
 
     blob.upload_from_string(json.dumps(data))
 
-    #TODO: inserire qui rimozione di file di cache che hanno superato periodo di validità (MAX_CACHE_AGE)
+    cleanup()   # rimozione cache meno recente
 
 
 # Leggi cache
-def load_alert_cache(h: str) -> dict | None:
-    initialize()
+def download_alert_cache(h: str) -> dict | None:
+    res.initialize()
     
-    blob = bucket.blob(f"{GCS_CACHE_DIR}/{h}.json")
+    blob = res.bucket.blob(f"{res.gcs_cache_dir}/{h}.json")
     
     if blob.exists():
         return json.loads(blob.download_as_text())
     
     return None
+
+
+# Pulizia cache meno recente
+def cleanup():
+    res.initialize()
+
+    prefix = f"{res.gcs_cache_dir}/"
+    blobs = res.bucket.list_blobs(prefix=prefix)
+
+    now = time.time()
+    deleted = 0
+
+    for blob in blobs:
+        try:
+            data = json.loads(blob.download_as_text())
+            last_mod = data.get("last_modified", 0)
+
+            if now - last_mod > res.max_cache_age:
+                blob.delete()
+                deleted += 1
+        except Exception as e:
+            print(f"[cache_utils|cleanup] Errore durante controllo cache {blob.name}: {e}")
+
+    print(f"Pulizia cache completata - File rimossi: {deleted}")

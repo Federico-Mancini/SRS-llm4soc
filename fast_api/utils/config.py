@@ -16,18 +16,18 @@ RESULT_PATH = os.path.join(ASSET_DIR, RESULT_FILENAME)
 ALERTS_PATH = os.path.join(ASSET_DIR, ALERTS_FILENAME)
 
 
-# FastAPI endpoint
-UPLOAD_ENDPOINT = "/upload"
-RESULTS_ENDPOINT = "/results"
-ANALYZE_ENDPOINT = "/analyze"
-CHAT_ENDPOINT = "/chat"
-ANALYZE_ALL_ENDPOINT = "/analyze_all"
+# # FastAPI endpoint
+# UPLOAD_ENDPOINT = "/upload"
+# RESULTS_ENDPOINT = "/results"
+# ANALYZE_ENDPOINT = "/analyze"
+# CHAT_ENDPOINT = "/chat"
+# ANALYZE_ALL_ENDPOINT = "/analyze_all"
 
 
 # GCS
 ASSET_BUCKET_NAME = "main-asset-storage"
 GCS_BATCH_DIR = "input_batches" # cartella per i file con partizioni di batch originale
-GCS_CACHE_DIR = "caches"        # cartella per i file di cache dedicati ai singoli alert
+GCS_CACHE_DIR = "cache"         # cartella per i file di cache dedicati ai singoli alert
 GCS_RESULT_DIR = "results"      # cartella per i file con i risultati
 
 

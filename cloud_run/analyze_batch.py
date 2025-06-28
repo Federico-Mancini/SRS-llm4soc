@@ -1,40 +1,10 @@
 import json, time, asyncio, datetime
-import utils.vertexai_utils as vxc
-import utils.gcs_utils as gcs
 
-from google.cloud import storage
-from utils.cache_utils import alert_hash, load_alert_cache, save_alert_cache
+from utils.cache_utils import alert_hash, download_alert_cache, upload_alert_cache
+from utils.resource_manager import ResourceManager
 
 
-initialized = False
-model = None
-gen_conf = None
-bucket = None
-MAX_CONCURRENT_REQUESTS = 5
-
-
-# -- Funzioni -------------------------------------------------
-
-# Inizializzazione var. d'ambiente
-def initialize():
-    global initialized, model, gen_conf, bucket, MAX_CONCURRENT_REQUESTS
-
-    if not initialized:
-        # Vertex AI configuration
-        vxc.init()
-        model = vxc.get_model()
-        gen_conf = vxc.get_generation_config()
-
-        # Estrazione di variabili d'ambiente (condivise su GCS)
-        conf = gcs.download_config()
-        print(f"Config ricevuta: {conf}")
-        ASSET_BUCKET_NAME = conf["asset_bucket_name"]
-        MAX_CONCURRENT_REQUESTS = conf["max_concurrent_requests"]
-
-        # Connessione al bucket
-        bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
-
-        initialized = True
+res = ResourceManager()
 
 
 def build_prompt(alert) -> str:
@@ -87,12 +57,12 @@ def build_alert_entry(i, t, c, e) -> dict:
 
 
 def analyze_single_alert(alert) -> dict:
-    initialize()
+    res.initialize()
 
     prompt = build_prompt(alert)
 
     try:
-        response = model.generate_content(prompt, generation_config=gen_conf)
+        response = res.model.generate_content(prompt, generation_config=res.gen_conf)
         text = response.text.strip()
 
         if "{" in text and "}" in text:
@@ -132,29 +102,29 @@ async def analyze_alert_async(i, alert, semaphore, model, gen_conf) -> dict:
             return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
 
 async def analyze_batch_async(batch_path: str) -> list:
-    initialize()
+    res.initialize()
 
-    blob = bucket.blob(batch_path)
+    blob = res.bucket.blob(batch_path)
 
     # Lettura del file batch '.jsonl'
     lines = blob.download_as_text().splitlines()
     alerts = [json.loads(line) for line in lines if line.strip()]
 
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+    semaphore = asyncio.Semaphore(res.max_concurrent_requests)
     results = []
 
     ### START - Funzione interna per gestione cache
     async def process_alert(i, alert) -> dict:
-        cached = load_alert_cache(alert_hash(alert))    # lettura cache
+        cached = download_alert_cache(alert_hash(alert))    # lettura cache
 
         if cached:
             print(f"Cache hit for alert {i}")
             result = cached.copy()
         else:
-            result = await analyze_alert_async(i, alert, semaphore, model, gen_conf) # classificazione alert
+            result = await analyze_alert_async(i, alert, semaphore, res.model, res.gen_conf) # classificazione alert
             
             # Salvataggio cache (dati rilevanti di alert in file remoto dedicato)
-            save_alert_cache({
+            upload_alert_cache({
                 "last_modified": time.time(),
                 "class": result.get("class", "error"),
                 "explanation": result.get("explanation", "error")
@@ -170,9 +140,9 @@ async def analyze_batch_async(batch_path: str) -> list:
 
     # Salvataggio risultati su GCS
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")   # ID istanza Cluod Run attualmente in esecuzione
-    result_path = f"{GCS_RESULT_DIR}/result-{run_id}.json"
+    result_path = f"{res.gcs_result_dir}/result-{run_id}.json"
     
-    bucket.blob(result_path).upload_from_string(json.dumps(results, indent=2))
+    res.bucket.blob(result_path).upload_from_string(json.dumps(results, indent=2))
 
     print(f"File {result_path} salvato su GCS")
     return results
