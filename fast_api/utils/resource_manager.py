@@ -1,7 +1,7 @@
 import json
 
 from google.cloud import storage
-from logger_utils import logger
+from utils.logger_utils import logger
 
 
 ASSET_BUCKET_NAME = "main-asset-storage"

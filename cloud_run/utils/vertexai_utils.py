@@ -3,7 +3,7 @@
 import vertexai
 
 from vertexai.generative_models import GenerativeModel, GenerationConfig
-from logger_utils import logger
+from utils.logger_utils import logger
 
 
 PROJECT_ID = "gruppo-4-456912"
@@ -19,7 +19,7 @@ def init():
 
     except Exception as e:
         logger.error(f"[CRR][vertexai_utils][init] Failed to initialize Vertex AI: {e}")
-        exit()
+        raise RuntimeError("Failed to initialize Vertex AI module")
 
 
 # Load the generative model
