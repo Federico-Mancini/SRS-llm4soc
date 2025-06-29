@@ -1,19 +1,58 @@
-import gcs_utils as gcs
+import json
+
+from google.cloud import storage
+from logger_utils import logger
+
+
+ASSET_BUCKET_NAME = "main-asset-storage"
+CONFIG_FILENAME = "config.json"
 
 
 class ResourceManager:
     def __init__(self):
-        self.initialized = False
-        self.n_batches = 3
-        self.result_filename = "result.json"
-        self.gcs_result_dir = "results"
+        self._initialized = False
+        self._logger = logger
+        self._n_batches = 3
+        self._gcs_result_dir = "results"
+        self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
 
     def initialize(self):
-        if not self.initialized:
-            conf = gcs.download_config()
-            self.n_batches = conf["n_batches"]
-            self.result_filename = conf["result_filename"]
-            self.gcs_result_dir = conf["gcs_result_dir"]
-            
-            self.initialized = True
+        if self._initialized:
+            return
+        
+        # Connessione al bucket GCS
+        self._bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
+
+        # Download variabili d'ambiente condivise su GCS
+        conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
+
+        # Variabili d'ambiente condivise su GCS
+        self._n_batches = conf.get("n_batches", self._n_batches)
+        self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
+        self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
+
+        self._initialized = True
+        self._logger.info("[CRF][resource_manager][initialize] Initialization completed")
+
+
+    @property
+    def logger(self):
+        self.initialize()
+        return self._logger
+    
+    @property
+    def n_batches(self):
+        self.initialize()
+        return self._n_batches
+
+    @property
+    def gcs_result_dir(self):
+        self.initialize()
+        return self._gcs_result_dir
+    
+    @property
+    def gcs_batch_result_dir(self):
+        self.initialize()
+        return self._gcs_batch_result_dir
+    

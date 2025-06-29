@@ -1,25 +1,16 @@
-import os ,json, logging
+# VMS: Virtual Machine Server
 
-from datetime import datetime
-from google.cloud import storage
+import os ,json
+import utils.gcs_utils as gcs
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from utils.resource_manager import ResourceManager
 from utils.auth_utils import call_runner
-from utils.gcs_utils import download_from_gcs, upload_config
-from utils.config import N_BATCHES, RESULT_FILENAME, RESULT_PATH, ASSET_BUCKET_NAME, GCS_BATCH_DIR, CLOUD_RUN_URL
 
 
-# --- Logging -----------------------------------
-os.makedirs("./assets", exist_ok=True)     # creazione cartella per i log, in caso non esista
-
-logging.basicConfig(
-    filename="./assets/server.log",
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
+res = ResourceManager()
 
 
 # --- API configuration -------------------------
@@ -34,8 +25,8 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    upload_config()    # caricamento variabili d'ambiente su GCS
-    logging.info("Fast API - API avviata e pronta.")
+    gcs.upload_to("", res.vms_config_filename)    # ad ogni avvio carico il file 'config.json' su GCS
+    res.logger.info("[VMS][app][startup_event] Virtual Machine Server - Status: running")
 
 
 # --- Endpoints ---------------------------------
@@ -48,38 +39,49 @@ def read_root():
 @app.get("/check-status")
 async def check_status():
     try:
-        data = await call_runner("GET", CLOUD_RUN_URL)
+        data = await call_runner("GET", res.runner_url)
         status = data.get("status", "unknown")
 
     except Exception as e:
-        logging.error(f"[app|check_status] Errore: {e}")
+        res.logger.error(f"[VMS][app][check_status] Unknown error: {e}")
         status = f"errore: {str(e)}"
 
     return {"API": "running", "runner": status}
 
 
-# Visualizzazione alert classificati
-@app.get("/results")
-def get_results():
-    download_from_gcs(RESULT_FILENAME)     # download risultati da GCS
+# Visualizzazione file con alert classificati
+@app.get("/result")
+def get_result(dataset_filename: str = Query(...)):
+    dataset_name = os.path.splitext(dataset_filename)[0]
+    gcs_result_path = f"{res.gcs_result_dir}/{dataset_name}_result.json"
+    blob = res.bucket.blob(gcs_result_path)
     
-    if not os.path.exists(RESULT_PATH):
-        logging.warning(f"GET /results | File '{RESULT_FILENAME}' non trovato")
-        raise HTTPException(status_code=404, detail=f"File '{RESULT_FILENAME}' non trovato")
+    # Controllo esistenza file remoto
+    if not blob.exists():
+        res.logger.warning(f"[VMS][app][get_result] File {gcs_result_path} not found")
+        raise HTTPException(status_code=404, detail=f"File {gcs_result_path} non trovato")
+
+    blob.download_to_filename(res.vms_result_path)
+
+    # Controllo esito download in locale
+    if not os.path.exists(res.vms_result_path):
+        res.logger.warning(f"[VMS][app][get_result] Downloaded file {res.vms_result_path} not found")
+        raise HTTPException(status_code=404, detail=f"File scaricato {res.vms_result_path} non trovato")
     
     try:
-        with open(RESULT_PATH, "r") as f:
+        with open(res.vms_result_path, "r") as f:
             data = json.load(f)
-        logging.info(f"GET /results | File letto: '{RESULT_FILENAME}'")
+
+        res.logger.info(f"[VMS][app][get_result] File {res.vms_result_path} read")
         return data
     
     except json.JSONDecodeError:
-        logging.error(f"GET /results | Errore parsing '{RESULT_FILENAME}'")
-        raise HTTPException(status_code=500, detail=f"Errore nel parsing del file {RESULT_FILENAME}")
+        res.logger.error(f"[VMS][app][get_result] Failed to parse {res.vms_result_path} ({type(e)}): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore nel parsing del file {res.vms_result_path} ({type(e)}): {str(e)}")
     
     except Exception as e:
-        logging.error(f"GET /results | Error reading '{RESULT_FILENAME}': {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Errore nella lettura del file '{RESULT_FILENAME}': {str(e)}")
+        res.logger.error(f"[VMS][app][get_result] Failed to read {res.vms_result_path} ({type(e)}): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore nella lettura del file {res.vms_result_path} ({type(e)}): {str(e)}")
 
 
 # (TODO: controllare formato di risposta e magari renderla più discorsiva)
@@ -87,62 +89,62 @@ def get_results():
 async def chat(request: Request):
     try:
         alert_json = await request.json()
+        
         result = await call_runner(
             method="POST",
-            url=f"{CLOUD_RUN_URL}/run-alert",
+            url=f"{res.runner_url}/run-alert",
             json={"alert": alert_json}
         )
 
-        logging.info(f"Alert inviato a Cloud Run")
+        res.logger.info("[VMS][app][chat] Request sent to the runner")
 
     except Exception as e:
-        logging.error(f"[app|chat] Errore in invio alert: {e}")
-        return {"explanation": f"Errore sconosciuto. Ulteriori info nei log locali al server Fast API"}
+        res.logger.error(f"[VMS][app][chat] Failed to send alert data ({type(e)}): {str(e)}")
+        return {"explanation": f"Errore sconosciuto ({type(e)}): {str(e)}"}
     
     return {"explanation": result["explanation"]}
 
 
-
-# Endpoint che riceve file con dataset, lo divide in N batch per farli poi eseguire in parallelo dal server Cloud Run
-@app.post("/analyze-all")
-async def analyze_all(file: UploadFile = File(...), n_batches: int = Query(N_BATCHES, gt=0)):
-   # Caricamento variabili d'ambiente su GCS
-    upload_config(n_batches)
-
-    # Elaborazione dati
-    content = await file.read()
-    lines = content.decode().splitlines()
-    total = len(lines)
-    chunk_size = total // n_batches
-    run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
-
-    # Connessione al bucket
-    bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
-
-    for i in range(n_batches):
-        # Suddivisione file in N batch
-        start = i * chunk_size
-        end = (i + 1) * chunk_size if i < n_batches - 1 else total
-        batch_lines = lines[start:end]
-        #batch_lines = lines[i*chunk_size:(i+1)*chunk_size] if i < n_batches - 1 else lines[i*chunk_size:]      #(versione compatta)
+# Caricamento dataset (.jsonl o .csv) su GCS
+@app.post("/upload-alerts")
+async def upload_alerts(file: UploadFile = File(...)):
+    # Controllo estensione file ricevuto
+    if not file.filename.endswith(".jsonl"):
+        res.logger.warning(f"[VMS][app][upload_alerts] Invalid file extension: {file.filename}")
+        raise HTTPException(status_code=400, detail="Formato file non supportato. Estensioni valide: jsonl")
+    
+    try:
+        gcs.upload_to(res.gcs_dataset_dir, file.filename)
+        res.logger.info(f"[VMS][app][upload_alerts] File {file.filename} uploaded")
         
-        # Salvataggio file batch in GCS
-        batch_path = f"{GCS_BATCH_DIR}/{run_id}-batch-{i}.jsonl"
-        blob = bucket.blob(batch_path)
-        blob.upload_from_string("\n".join(batch_lines))
+        return {"filename": file.filename, "message": "File caricato con successo"}
 
-        # Invia richiesta HTTP a Cloud Run per analizzare l'i-esimo batch
-        try:
-            await call_runner(
-                method="POST",
-                url=f"{CLOUD_RUN_URL}/run-batch",
-                json={"batch_file": batch_path}
-            )
+    except Exception as e:
+        res.logger.error(f"[VMS][app][upload_alerts] Failed to upload ({type(e)}): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Errore nel caricamento del file: {str(e)}")
 
-            logging.info(f"Batch {i} inviato a Cloud Run")
 
-        except Exception as e:
-            logging.error(f"[app|analyze_all] Errore in invio batch {i}: {e}")
-            return {"message": f"Errore in invio batch {i}. Ulteriori info nei log locali al server Fast API", "run_id": run_id}
+# Analisi dataset remoto (già caricato su GCS)
+@app.post("/analyze-alerts")
+async def analyze_alerts(dataset_filename: str = Query(...)):
+    try:        
+        response = await call_runner(
+            method="GET",
+            url=f"{res.runner_url}/run-dataset?dataset_filename={dataset_filename}"
+        )
 
-    return {"message": f"{n_batches} batch inviati", "run_id": run_id}
+        res.logger.info("[VMS][app][analyze_alerts] Request sent to the runner")
+
+    except Exception as e:
+        res.logger.error(f"[VMS][app][analyze_alerts] Failed to send request ({type(e)}): {str(e)}")
+        return {"message": f"Errore sconosciuto ({type(e)}): {str(e)}"}
+    
+    return response
+
+# Flusso di operazioni:
+# 1) Check   = [U] invio GET a /check-status -> [VMS] invio GET a / (root) = restituzione stato di VMS e CRR
+# 2) Chat    = [U] invio alert a /chat -> [VMS] invio alert a /run-alert -> [CRR] analisi singolo alert = restituzione alert classificato
+# 3) Dataset = [U] invio file dataset a /upload-alerts = restituzione esito operazione di caricamento file
+#              [U] invio nome dataset a /analyze-alerts -> [VMS] invio nome dataset a /run-dataset -> [CRR] analisi dataset = restituzione esito operazione d'avviamento analisi
+#              NB: il CRR si occupa automaticamente di suddividere il dataset in batch, di analizzare questi uno ad uno, alert dopo alert;
+#                  gli alert classificati sono poi raggruppati per batch e salvati in file "result-batchID.json" temporanei, in attesa che la CRF li unisca nel file finale "result.json".

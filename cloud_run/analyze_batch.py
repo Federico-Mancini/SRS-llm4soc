@@ -1,6 +1,6 @@
-import json, time, asyncio, datetime
+import os, json, time, asyncio, datetime
 
-from utils.cache_utils import alert_hash, download_alert_cache, upload_alert_cache
+from utils.cache_utils import alert_hash, cleanup_cache, download_cache, upload_cache
 from utils.resource_manager import ResourceManager
 
 
@@ -57,8 +57,6 @@ def build_alert_entry(i, t, c, e) -> dict:
 
 
 def analyze_single_alert(alert) -> dict:
-    res.initialize()
-
     prompt = build_prompt(alert)
 
     try:
@@ -80,12 +78,12 @@ def analyze_single_alert(alert) -> dict:
 
 
 # Funzione interna (privata), usata da analyze_batch_async
-async def analyze_alert_async(i, alert, semaphore, model, gen_conf) -> dict:
+async def analyze_alert_async(i, alert, semaphore) -> dict:
     prompt = build_prompt(alert)
 
     async with semaphore:
         try:
-            response = await asyncio.to_thread(model.generate_content, prompt, generation_config=gen_conf)
+            response = await asyncio.to_thread(res.model.generate_content, prompt, generation_config=res.gen_conf)
             text = response.text.strip()
 
             if "{" in text and "}" in text:
@@ -101,48 +99,59 @@ async def analyze_alert_async(i, alert, semaphore, model, gen_conf) -> dict:
         except Exception as e:
             return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
 
-async def analyze_batch_async(batch_path: str) -> list:
-    res.initialize()
+async def analyze_gcs_batch(dataset_filename: str, batch_path: str) -> str:
+    res.logger.info(f"[CRR][analyze_batch][analyze_gcs_batch] Analysis of {batch_path}")
 
-    blob = res.bucket.blob(batch_path)
+    try:
+        cleanup_cache() # TODO: vedere se c'è un punto migliore in cui eseguire la pulizia della cache
 
-    # Lettura del file batch '.jsonl'
-    lines = blob.download_as_text().splitlines()
-    alerts = [json.loads(line) for line in lines if line.strip()]
+        blob = res.bucket.blob(batch_path)
 
-    semaphore = asyncio.Semaphore(res.max_concurrent_requests)
-    results = []
+        if not blob.exists():
+            res.logger.error(f"[CRR][analyze_batch][analyze_gcs_batch] Batch file {batch_path} not found")
+            raise FileNotFoundError(f"Batch file '{batch_path}' not found")
 
-    ### START - Funzione interna per gestione cache
-    async def process_alert(i, alert) -> dict:
-        cached = download_alert_cache(alert_hash(alert))    # lettura cache
+        data = blob.download_as_text().strip().splitlines()
+        alerts = [json.loads(line) for line in data if line.strip()]
 
-        if cached:
-            print(f"Cache hit for alert {i}")
-            result = cached.copy()
-        else:
-            result = await analyze_alert_async(i, alert, semaphore, res.model, res.gen_conf) # classificazione alert
-            
-            # Salvataggio cache (dati rilevanti di alert in file remoto dedicato)
-            upload_alert_cache({
-                "last_modified": time.time(),
-                "class": result.get("class", "error"),
-                "explanation": result.get("explanation", "error")
-            })
+        semaphore = asyncio.Semaphore(res.max_concurrent_requests)
 
-        result["id"] = i
-        return result
-    ### END
+        ### START - Funzione interna per gestione cache
+        async def process_alert(i, alert) -> dict:
+            cached = download_cache(alert_hash(alert))    # lettura cache
 
-    # Creazione task asincrono per ogni alert
-    tasks = [process_alert(i, alert) for i, alert in enumerate(alerts, start=1)]
-    results = await asyncio.gather(*tasks)              # lista in cui salvare i risultati ottenuti da elaborazione parallela
+            if cached:
+                result = cached.copy()
+            else:
+                result = await analyze_alert_async(i, alert, semaphore) # classificazione alert
+                
+                # Salvataggio cache (dati rilevanti di alert in file remoto dedicato)
+                upload_cache({
+                    "last_modified": time.time(),
+                    "class": result.get("class", "error"),
+                    "explanation": result.get("explanation", "error")
+                })
 
-    # Salvataggio risultati su GCS
-    run_id = datetime.now().strftime("%Y%m%d-%H%M%S")   # ID istanza Cluod Run attualmente in esecuzione
-    result_path = f"{res.gcs_result_dir}/result-{run_id}.json"
-    
-    res.bucket.blob(result_path).upload_from_string(json.dumps(results, indent=2))
+            result["id"] = i
+            return result
+        ### END
 
-    print(f"File {result_path} salvato su GCS")
-    return results
+        # Creazione task asincrono per ogni alert
+        res.logger.info("[CRR][analyze_batch][analyze_batch_async] Executing parallel tasks")
+        tasks = [process_alert(i, alert) for i, alert in enumerate(alerts, start=1)]
+        results = await asyncio.gather(*tasks)              # lista in cui salvare i risultati ottenuti da elaborazione parallela
+
+        # Salvataggio risultati su GCS
+        res.logger.info(f"[CRR][analyze_batch][analyze_batch_async] Uploading results on GCS")
+        dataset_name = os.path.splitext(dataset_filename)[0]    # dataset da cui deriva il batch
+        run_id = datetime.now().strftime("%Y%m%d-%H%M%S")       # ID istanza Cluod Run attualmente in esecuzione
+        result_path = f"{res.gcs_batch_result_dir}/{dataset_name}_result-{run_id}.json"
+
+        res.bucket.blob(result_path).upload_from_string(json.dumps(results, indent=2))
+
+        res.logger.info(f"[CRR][analyze_batch][analyze_batch_async] Upload to {result_path} completed")
+        return results
+
+    except Exception as e:
+        res.logger.error(f"[CRR][analyze_batch] Unknown error ({type(e)}): {str(e)}")
+        raise

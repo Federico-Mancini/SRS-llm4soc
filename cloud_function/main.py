@@ -1,3 +1,5 @@
+# CRF: Cloud Run Function
+
 import json
 
 from google.cloud import storage
@@ -9,16 +11,14 @@ res = ResourceManager()
 
 # Merge single result files in one final 'result.json' (eseguita come Cloud Function al trigger di GCS, cioè ogni volta che un file 'result' viene creato)
 def merge_handler(event, context):
-    res.initialize()
-
     # Connessione al bucket
-    bucket_name = event['bucket']                   # estrazione nome bucket da chi ha generato l'evento trigger
+    bucket_name = event['bucket']   # estrazione nome bucket da chi ha generato l'evento trigger
     bucket = storage.Client().bucket(bucket_name)
-    blobs = list(bucket.list_blobs(prefix=f"{res.gcs_result_dir}/result-"))
+    blobs = list(bucket.list_blobs(prefix=f"{res.gcs_batch_result_dir}/"))
 
     # Controllo presenza di tutti i file attesi
     if len(blobs) < res.n_batches:
-        print(f"Solo {len(blobs)}/{res.n_batches} file 'result' presenti. In attesa di altri...")
+        res.logger.info(f"[CRF][main][merge_handler] Found only {len(blobs)}/{res.n_batches} files. Waiting for others...")
         return
 
     # Unione dei file 'result'
@@ -29,13 +29,17 @@ def merge_handler(event, context):
             if isinstance(data, list):
                 merged.extend(data)
         except Exception as e:
-            print(f"Impossibile leggere {blob.name}: {e}")
+            res.logger.warning(f"[CRF][main][merge_handler] Failed to read file {blob.name} ({type(e)}): {str(e)}")
 
-    merged_blob = bucket.blob(res.result_filename)                  # creazione riferimento a nuovo file nel bucket
-    merged_blob.upload_from_string(json.dumps(merged, indent=2))    # caricamento dati effettivo
+    dataset_name = blobs[0].name.split("_result-")[0]
+    gcs_result_path = f"{res.gcs_result_dir}/{dataset_name}_result.json"
+    merged_blob = bucket.blob(gcs_result_path)
+    merged_blob.upload_from_string(json.dumps(merged, indent=2))
 
-    print(f"{len(merged)} alert salvati in {res.result_filename}")
+    res.logger.info(f"[CRF][main][merge_handler] {len(merged)} alerts saved in {gcs_result_path}")
 
     # Rimozione singoli file 'result' (non più necessari)
     for blob in blobs:
         blob.delete()
+
+    res.logger.info(f"[CRF][main][merge_handler] Files deleted successfully")

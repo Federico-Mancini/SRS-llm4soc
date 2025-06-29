@@ -1,59 +1,42 @@
-import os, json
+import os
 
 from google.cloud import storage
-from utils.config import N_BATCHES, ASSET_DIR, RESULT_FILENAME, ASSET_BUCKET_NAME,\
-    GCS_CACHE_DIR, GCS_RESULT_DIR, MAX_CONCURRENT_REQUESTS, MAX_CACHE_AGE
+from utils.resource_manager import ResourceManager
 
 
-# Download file from GCS
-def download_from_gcs(folder: str, filename: str):
-    os.makedirs(ASSET_DIR, exist_ok=True)   # creazione cartella "assets" in caso non esista
+res = ResourceManager()
+
+
+# Download file remoti
+def download_from(folder: str, filename: str):
+    os.makedirs("assets", exist_ok=True)   # creazione cartella "assets" in caso non esista
 
     # Creazione path
-    local_path = os.path.join(ASSET_DIR, filename)
+    local_path = os.path.join("assets", filename)
     gcs_path = f"{folder}/{filename}"      # NB: rispettare il format GCS per le directory (niente punto iniziale e barra finale)
 
     # Connessione al bucket
-    blob = storage.Client().bucket(ASSET_BUCKET_NAME).blob(gcs_path)
+    blob = storage.Client().bucket(res.asset_bucket_name).blob(gcs_path)
 
     if blob.exists():
         blob.download_to_filename(local_path)   # download effettivo del file remoto
-        print(f"File scaricato da GCS: {gcs_path} -> {local_path}")
+        res.logger.info(f"[VMS][gcs_utils][download_from_gcs] File {gcs_path} downloaded into {local_path}")
     else:
-        print(f"File non trovato su GCS: {gcs_path}")
+        res.logger.info(f"[VMS][gcs_utils][download_from_gcs] File {gcs_path} not found")
 
 
-# Upload file to GCS
-def upload_to_gcs(folder: str, filename: str):
+# Upload file locali
+def upload_to(folder: str, filename: str):
     # Creazione path
-    local_path = os.path.join(ASSET_DIR, filename)
+    local_path = os.path.join("assets", filename)
     gcs_path = f"{folder}/{filename}"      # NB: rispettare il format GCS per le directory (niente punto iniziale e barra finale)
 
     # Controllo esistenza file locale
     if not os.path.isfile(local_path):
-        print(f"File locale non trovato: {local_path}")
+        res.logger.error(f"[VMS][gcs_utils][upload_to_gcs] File {local_path} not found")
         return
-
-    # Connessione al bucket
-    blob = storage.Client().bucket(ASSET_BUCKET_NAME).blob(gcs_path)
-
+    
     # Caricamento dati su file remoto
+    blob = res.bucket.blob(gcs_path)
     blob.upload_from_filename(local_path)
-    print(f"File caricato su GCS: {local_path} -> {gcs_path}")
-
-
-# Upload file with shared configuration constants
-def upload_config(n: int = N_BATCHES):
-    conf_obj = {
-        "n_batches": n,
-        "result_filename": RESULT_FILENAME,
-        "asset_bucket_name": ASSET_BUCKET_NAME,
-        "gcs_cache_dir": GCS_CACHE_DIR,
-        "gcs_result_dir": GCS_RESULT_DIR,
-        "max_concurrent_requests": MAX_CONCURRENT_REQUESTS,
-        "max_cache_age": MAX_CACHE_AGE
-    }
-
-    blob = storage.Client().bucket(ASSET_BUCKET_NAME).blob("config.json")
-    blob.upload_from_string(json.dumps(conf_obj, indent=2))
-
+    res.logger.info(f"[VMS][gcs_utils][upload_to_gcs] File {local_path} uploaded to {gcs_path}")

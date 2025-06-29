@@ -1,7 +1,11 @@
-import logging, httpx
+import httpx
 
 from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2 import id_token
+from resource_manager import ResourceManager
+
+
+res = ResourceManager()
 
 
 # Creazione header per chiamate al runner su Cloud Run
@@ -12,12 +16,12 @@ def get_auth_header(audience_url: str) -> dict:
         return {"Authorization": f"Bearer {token}"}
     
     except Exception as e:
-        logging.error(f"[auth_utils] Errore in creazione header di autenticazione: {e}")
+        res.logger.error(f"[VMS][auth_utils][get_auth_header] Failed to create authentication header: {e}")
         raise
 
 
 # Gestore chiamate al runner su Cloud Run
-async def call_runner(method: str, url: str, json: dict = None, timeout: float = 10.0) -> dict:
+async def call_runner(method: str, url: str, json: dict = None, timeout: float = 50.0) -> dict:
     headers = get_auth_header(url)
 
     try:
@@ -31,19 +35,19 @@ async def call_runner(method: str, url: str, json: dict = None, timeout: float =
             else:
                 raise ValueError("Metodo HTTP non supportato")
             
-            logging.info(f"[{response.status_code}] Response text: {response.text}")
+            res.logger.info(f"[VMS][auth_utils][call_runner] {response.status_code} - {response.text}")
             
             response.raise_for_status()
             return response.json()
 
     except httpx.RequestError as e:
-        logging.error(f"[auth_utils|call_runner] Errore di connessione: {e}")
+        res.logger.error(f"[VMS][auth_utils][call_runner] Connection error ({type(e)}): {str(e)}")
         raise
 
     except httpx.HTTPStatusError as e:
-        logging.error(f"[auth_utils|call_runner] Risposta HTTP non valida: {e.response.status_code} - {e.response.text}")
+        res.logger.error(f"[VMS][auth_utils][call_runner] Invalid HTTP response ({type(e)}): {str(e)}")
         raise
 
     except Exception as e:
-        logging.error(f"[auth_utils|call_runner] Errore sconosciuto: {e}")
+        res.logger.error(f"[VMS][auth_utils][call_runner] Unknown error ({type(e)}): {str(e)}")
         raise

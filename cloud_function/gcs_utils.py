@@ -1,5 +1,9 @@
+#NB: non usare la classe ResourceManager, o potrebbero verificarsi dei loop di import
+
 import json
+
 from google.cloud import storage
+from logger_utils import logger
 
 
 def download_config() -> dict:
@@ -7,7 +11,7 @@ def download_config() -> dict:
     blob = storage.Client().bucket("main-asset-storage").blob("config.json")
 
     if not blob.exists():
-        print(f"Configurazione non trovata: 'config.json'")
+        logger.info(f"[CRF][gcs_utils][download_config] Configuration file not found")
         return {}
 
     config = json.loads(blob.download_as_text())

@@ -1,7 +1,7 @@
 import json, time, asyncio, datetime
 import utils.vertexai_config_OLD as vxc
 
-from utils.gcs_utils import upload_to_gcs
+from utils.gcs_utils import upload_to
 from utils.config import MAX_CONCURRENT_REQUESTS, RESULT_FILENAME, RESULT_PATH, ALERTS_PATH, CACHE_FILENAME, CACHE_PATH
 
 
@@ -180,7 +180,7 @@ async def analyze_batch_async(input_path=ALERTS_PATH, output_path=RESULT_PATH) -
 
     # Salvataggio risultati in remoto
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")   # ID istanza Cluod Run attualmente in esecuzione
-    upload_to_gcs(f"results/result-{run_id}.json")      # salvataggio dei risultati su GCS (va qui e non in "main.py" perché è responsabilità di "analyze_batch" l'elaborazione e archiviazione dei dati)
+    upload_to(f"results/result-{run_id}.json")      # salvataggio dei risultati su GCS (va qui e non in "main.py" perché è responsabilità di "analyze_batch" l'elaborazione e archiviazione dei dati)
 
     # Salvataggio risultati in locale
     with open(output_path, "w") as f:
