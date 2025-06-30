@@ -81,7 +81,6 @@ def get_result(dataset_filename: str = Query(...)):
         raise HTTPException(status_code=500, detail=f"Errore nella lettura del file {res.vms_result_path} ({type(e)}): {str(e)}")
 
 
-# (TODO: controllare formato di risposta e magari renderla più discorsiva)
 @app.post("/chat")
 async def chat(request: Request):
     try:
@@ -93,11 +92,12 @@ async def chat(request: Request):
             json={"alert": alert_json}
         )
 
-        res.logger.info("[VMS][app][chat] Request sent to the runner")
+        res.logger.info("[VMS][app][chat] -> Request sent to the runner")
 
     except Exception as e:
-        res.logger.error(f"[VMS][app][chat] Failed to send alert data ({type(e)}): {str(e)}")
-        return {"explanation": f"Errore sconosciuto ({type(e)}): {str(e)}"}
+        msg = f"[VMS][app][chat] -> Failed to send alert data ({type(e)}): {str(e)}"
+        res.logger.error(msg)
+        return {"explanation": msg}
     
     return {"explanation": result["explanation"]}
 
@@ -108,9 +108,9 @@ async def upload_alerts(file: UploadFile = File(...)):
     # (se un file con lo stesso nome è già presente su GCS, viene sovrascritto)
 
     # Controllo estensione file ricevuto
-    if not file.filename.endswith(".jsonl"):
-        res.logger.warning(f"[VMS][app][upload_alerts] Invalid file extension: {file.filename}")
-        raise HTTPException(status_code=400, detail="Formato file non supportato. Estensioni valide: jsonl")
+    if not file.filename.endswith(".jsonl", ".csv"):
+        res.logger.warning(f"[VMS][app][upload_alerts] -> Invalid file extension: {file.filename}")
+        raise HTTPException(status_code=400, detail="Formato file non supportato. Estensioni valide: jsonl, csv")
     
     try:
         blob_path = f"{res.gcs_dataset_dir}/{file.filename}"
