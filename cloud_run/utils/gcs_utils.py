@@ -109,4 +109,5 @@ def split_dataset(dataset_filename: str):
 
         batch_paths.append(out_path)
 
+    res.logger.info(f"[CRR][gcs_utils][split_dataset] -> Generation of {n_batches} batches completed")
     return batch_paths
