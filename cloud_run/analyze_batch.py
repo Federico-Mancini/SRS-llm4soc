@@ -135,7 +135,10 @@ async def analyze_gcs_batch(dataset_filename: str, batch_path: str) -> str:
 
         # Creazione task asincrono per ogni alert
         res.logger.info("[CRR][analyze_batch][analyze_batch_async] Executing parallel tasks")
-        tasks = [process_alert(i, alert) for i, alert in enumerate(alerts, start=1)]
+        tasks = [
+            process_alert(i, alert)
+            for i, alert in enumerate(alerts, start=1)
+        ]
         results = await asyncio.gather(*tasks)              # lista in cui salvare i risultati ottenuti da elaborazione parallela
 
         # Salvataggio risultati su GCS

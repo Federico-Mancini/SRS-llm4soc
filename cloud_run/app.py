@@ -43,7 +43,7 @@ async def run_alert(req: Request):
 async def run_batch(dataset_filename: str = Query(...), batch_path: str = Query(...)):
     try:
         res.logger.info(f"[CRR][runner][run_batch] Executing analysis of {batch_path}, from dataset {dataset_filename}")
-        result_path = analyze_gcs_batch(dataset_filename, batch_path)
+        result_path = await analyze_gcs_batch(dataset_filename, batch_path)
 
         return {
             "message": "Batch elaborato correttamente",
