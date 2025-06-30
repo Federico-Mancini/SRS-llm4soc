@@ -149,7 +149,7 @@ async def run_dataset(dataset_filename: str = Query(...)):
         log_entries = []
 
         async def retransmit_req(batch_path: str, index: int, client: httpx.AsyncClient):
-            url = (f"{res.runner_url}?dataset_filename={dataset_filename}&batch_path={batch_path}")
+            url = (f"{res.runner_url}/run-batch?dataset_filename={dataset_filename}&batch_path={batch_path}")
 
             async with semaphore:
                 try:
