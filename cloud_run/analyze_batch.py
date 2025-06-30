@@ -135,7 +135,7 @@ async def analyze_gcs_batch(dataset_filename: str, batch_path: str) -> str:
         ### END
 
         # Creazione task asincrono per ogni alert
-        res.logger.info("[CRR][analyze_batch][analyze_batch_async] Executing parallel tasks")
+        res.logger.info("[CRR][analyze_batch][analyze_gcs_batch] Executing parallel tasks")
         tasks = [
             process_alert(i, alert)
             for i, alert in enumerate(alerts, start=1)
@@ -143,16 +143,16 @@ async def analyze_gcs_batch(dataset_filename: str, batch_path: str) -> str:
         results = await asyncio.gather(*tasks)              # lista in cui salvare i risultati ottenuti da elaborazione parallela
 
         # Salvataggio risultati su GCS
-        res.logger.info(f"[CRR][analyze_batch][analyze_batch_async] Uploading results on GCS")
+        res.logger.info(f"[CRR][analyze_batch][analyze_gcs_batch] Uploading results on GCS")
         dataset_name = os.path.splitext(dataset_filename)[0]    # dataset da cui deriva il batch
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S")       # ID istanza Cluod Run attualmente in esecuzione
         result_path = f"{res.gcs_batch_result_dir}/{dataset_name}_result-{run_id}.json"
 
         res.bucket.blob(result_path).upload_from_string(json.dumps(results, indent=2))
 
-        res.logger.info(f"[CRR][analyze_batch][analyze_batch_async] Upload to {result_path} completed")
+        res.logger.info(f"[CRR][analyze_batch][analyze_gcs_batch] Upload to {result_path} completed")
         return results
 
     except Exception as e:
-        res.logger.error(f"[CRR][analyze_batch][analyze_batch_async] Unknown error ({type(e)}): {str(e)}")
+        res.logger.error(f"[CRR][analyze_batch][analyze_gcs_batch] Unknown error ({type(e)}): {str(e)}")
         raise
