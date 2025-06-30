@@ -157,7 +157,7 @@ async def run_dataset(dataset_filename: str = Query(...)):
                 except Exception as e:
                     msg = f"Batch {index} exception: {e}"
                     res.logger.error(f"[CRR][app][run_dataset] -> {msg}")
-                    log_entries.append({"batch": batch_path, "status": "error", "detail": str(e)})
+                    log_entries.append({"batch": batch_path, "status": "error", "detail": f"{e.response.status_code} {e.response.reason_phrase}"})
 
         # Funzione background per invio richieste e salvataggio log
         async def launch_batches_and_log():

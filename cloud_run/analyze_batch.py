@@ -1,5 +1,6 @@
-import os, json, time, asyncio, datetime
+import os, json, time, asyncio
 
+from datetime import datetime
 from utils.resource_manager import resource_manager as res
 from utils.cache_utils import alert_hash, cleanup_cache, download_cache, upload_cache
 
@@ -153,5 +154,5 @@ async def analyze_gcs_batch(dataset_filename: str, batch_path: str) -> str:
         return results
 
     except Exception as e:
-        res.logger.error(f"[CRR][analyze_batch] Unknown error ({type(e)}): {str(e)}")
+        res.logger.error(f"[CRR][analyze_batch][analyze_batch_async] Unknown error ({type(e)}): {str(e)}")
         raise
