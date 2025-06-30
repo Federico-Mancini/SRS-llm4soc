@@ -46,18 +46,29 @@ async def check_status():
     return {"server (VMS)": "running", "runner (CRR)": status}
 
 
-# # Check di stato di API e runner
-# @app.get("/check-batch-log")
-# async def check_batch_log():
-#     try:
-#         data = await call_runner("GET", res.runner_url)
-#         status = data.get("status", "unknown")
+# Download del batch log
+@app.get("/check-batch-log")
+async def check_batch_log():
+    try:
+        blob = res.bucket.blob("batch.log")
 
-#     except Exception as e:
-#         res.logger.error(f"[VMS][app][check_status] -> Unknown error: {e}")
-#         status = f"errore ({type(e)}): {str(e)}"
+        if not blob.exists():
+            res.logger.warning("[RUNNER][app][check_batch_log] -> File batch_log.json not found")
+            raise HTTPException(status_code=404, detail="File batch_log.json")
 
-#     return {"server (VMS)": "running", "runner (CRR)": status}
+        file_stream = io.BytesIO()
+        blob.download_to_file(file_stream)
+        file_stream.seek(0)
+
+        res.logger.info("[RUNNER][app][download_file_aa] File 'AA' downloaded successfully")
+
+        return StreamingResponse(file_stream, media_type="application/octet-stream", headers={
+            "Content-Disposition": "attachment; filename=AA"
+        })
+
+    except Exception as e:
+        res.logger.error(f"[RUNNER][app][download_file_aa] Failed to download 'AA': {e}")
+        raise HTTPException(status_code=500, detail="Errore durante il download del file")
 
 
 # Visualizzazione file con alert classificati
