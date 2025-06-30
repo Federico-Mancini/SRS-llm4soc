@@ -148,19 +148,11 @@ async def run_dataset(dataset_filename: str = Query(...)):
         # Lista dei risultati per il file di log
         log_entries = []
 
-        async def retransmit_req(batch_path: str, index: int, client: httpx.AsyncClient):
-            url = (f"{res.runner_url}/run-batch?dataset_filename={dataset_filename}&batch_path={batch_path}")
-
+        async def retransmit_req(batch_path: str, index: int):    
             async with semaphore:
                 try:
-                    response = await client.get(url)
-
-                    if response.status_code != 200:
-                        msg = f"Batch {index} failed: {response.text}"
-                        res.logger.error(f"[CRR][app][run_dataset] -> {msg}")
-                        log_entries.append({"batch": batch_path, "status": "failed", "detail": response.text})
-                    else:
-                        log_entries.append({"batch": batch_path, "status": "ok"})
+                    await run_batch(dataset_filename, batch_path)
+                    log_entries.append({"batch": batch_path, "status": "ok"})
                 
                 except Exception as e:
                     msg = f"Batch {index} exception: {e}"
@@ -169,12 +161,11 @@ async def run_dataset(dataset_filename: str = Query(...)):
 
         # Funzione background per invio richieste e salvataggio log
         async def launch_batches_and_log():
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                tasks = [
-                    retransmit_req(batch_path, i, client)
-                    for i, batch_path in enumerate(batch_paths)
-                ]
-                await asyncio.gather(*tasks)
+            tasks = [
+                retransmit_req(batch_path, i)
+                for i, batch_path in enumerate(batch_paths)
+            ]
+            await asyncio.gather(*tasks)
 
             # Salvataggio file log su GCS
             log_path = f"batch_log.json"

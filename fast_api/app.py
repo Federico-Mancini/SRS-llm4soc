@@ -52,7 +52,7 @@ async def get_batch_log():
     try:
         gcs.download_from("", "batch_log.json")
 
-        return {"message": "batch log downloaded"}
+        return {"message": "done"}
 
     except Exception as e:
         res.logger.error(f"[VMS][app][get_batch_log] Failed to download batch_log.json: {e}")
