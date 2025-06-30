@@ -46,6 +46,20 @@ async def check_status():
     return {"server (VMS)": "running", "runner (CRR)": status}
 
 
+# # Check di stato di API e runner
+# @app.get("/check-batch-log")
+# async def check_batch_log():
+#     try:
+#         data = await call_runner("GET", res.runner_url)
+#         status = data.get("status", "unknown")
+
+#     except Exception as e:
+#         res.logger.error(f"[VMS][app][check_status] -> Unknown error: {e}")
+#         status = f"errore ({type(e)}): {str(e)}"
+
+#     return {"server (VMS)": "running", "runner (CRR)": status}
+
+
 # Visualizzazione file con alert classificati
 @app.get("/result")
 def get_result(dataset_filename: str = Query(...)):

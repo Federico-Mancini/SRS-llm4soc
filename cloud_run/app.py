@@ -1,7 +1,7 @@
 # CRR: Cloud Run Runner
 # (il runner va in "stand by" dopo un po'. A ogni primo utilizzo serve quindi inviargli una richiesta dummy per svegliarlo)
 
-import os, json, httpx, asyncio, datetime
+import json, httpx, asyncio
 import utils.gcs_utils as gcs
 
 from fastapi import FastAPI, Request, Query, HTTPException
@@ -149,7 +149,7 @@ async def run_dataset(dataset_filename: str = Query(...)):
         log_entries = []
 
         async def retransmit_req(batch_path: str, index: int, client: httpx.AsyncClient):
-            url = (f"https://llm4soc-runner-url/run-batch?dataset_filename={dataset_filename}&batch_path={batch_path}")
+            url = (f"{res.runner_url}?dataset_filename={dataset_filename}&batch_path={batch_path}")
 
             async with semaphore:
                 try:
