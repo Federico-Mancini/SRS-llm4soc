@@ -177,7 +177,7 @@ async def run_dataset(dataset_filename: str = Query(...)):
                 await asyncio.gather(*tasks)
 
             # Salvataggio file log su GCS
-            log_path = f"batch_log.py"
+            log_path = f"batch_log.json"
             res.bucket.blob(log_path).upload_from_string(json.dumps(log_entries, indent=2))
             res.logger.info(f"[CRR][app][run_dataset] -> Batch log uploaded into {log_path}")
 

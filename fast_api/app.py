@@ -48,26 +48,14 @@ async def check_status():
 
 # Download del batch log
 @app.get("/check-batch-log")
-async def check_batch_log():
+async def get_batch_log():
     try:
-        blob = res.bucket.blob("batch.log")
+        gcs.download_from("", "batch_log.json")
 
-        if not blob.exists():
-            res.logger.warning("[RUNNER][app][check_batch_log] -> File batch_log.json not found")
-            raise HTTPException(status_code=404, detail="File batch_log.json")
-
-        file_stream = io.BytesIO()
-        blob.download_to_file(file_stream)
-        file_stream.seek(0)
-
-        res.logger.info("[RUNNER][app][download_file_aa] File 'AA' downloaded successfully")
-
-        return StreamingResponse(file_stream, media_type="application/octet-stream", headers={
-            "Content-Disposition": "attachment; filename=AA"
-        })
+        return {"message": "batch log downloaded"}
 
     except Exception as e:
-        res.logger.error(f"[RUNNER][app][download_file_aa] Failed to download 'AA': {e}")
+        res.logger.error(f"[VMS][app][get_batch_log] Failed to download batch_log.json: {e}")
         raise HTTPException(status_code=500, detail="Errore durante il download del file")
 
 
