@@ -135,7 +135,7 @@ async def run_batch(dataset_filename: str = Query(...), batch_path: str = Query(
 #         res.logger.error(msg)
 #         raise HTTPException(status_code=500, detail=msg)
 
-
+@app.get("/run-dataset")
 async def run_dataset(dataset_filename: str = Query(...)):
     try:
         # Pulizia e preparazione
