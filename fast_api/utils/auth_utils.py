@@ -2,10 +2,7 @@ import httpx
 
 from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2 import id_token
-from resource_manager import ResourceManager
-
-
-res = ResourceManager()
+from utils.resource_manager import resource_manager as res
 
 
 # Creazione header per chiamate al runner su Cloud Run

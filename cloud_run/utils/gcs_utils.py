@@ -1,8 +1,5 @@
 import os, json
-from utils.resource_manager import ResourceManager
-
-
-res = ResourceManager()
+from utils.resource_manager import resource_manager as res
 
 
 # Svuotamento directory

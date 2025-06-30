@@ -1,10 +1,7 @@
 import os, json, time, asyncio, datetime
 
+from utils.resource_manager import resource_manager as res
 from utils.cache_utils import alert_hash, cleanup_cache, download_cache, upload_cache
-from utils.resource_manager import ResourceManager
-
-
-res = ResourceManager()
 
 
 def build_prompt(alert) -> str:

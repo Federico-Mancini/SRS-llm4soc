@@ -1,4 +1,4 @@
-import json
+import os, json
 
 from google.cloud import storage
 from utils.logger_utils import logger
@@ -19,6 +19,7 @@ class ResourceManager:
         self._vms_config_filename = "config.json"
         self._vms_result_path = "assets/result.json"
         self._runner_url = ""   # per sicurezza, valore di default vuoto
+        self.initialize()
 
     def initialize(self):
         if self._initialized:
@@ -28,7 +29,7 @@ class ResourceManager:
         self._bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
 
         # Download variabili d'ambiente condivise su GCS
-        conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
+        conf = self.get_config()
 
         # Variabili d'ambiente condivise su GCS
         self._asset_bucket_name = conf.get("asset_bucket_name", self._asset_bucket_name)
@@ -41,43 +42,47 @@ class ResourceManager:
         self._initialized = True
         self._logger.info("[VMS][resource_manager][initialize] Initialization completed")
 
+    def get_config(self) -> dict:
+        try:
+            return json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
+        except Exception:
+            self._logger.warning(f"[VMS][resource_manager][get_config] File {CONFIG_FILENAME} not found on GCS. Using local version as fallback")
+            with open(os.path.join("assets", CONFIG_FILENAME), "r") as f:
+                return json.load(f)
+
 
     @property
     def logger(self):
-        self.initialize()
         return self._logger
     
     @property
     def bucket(self):
-        self.initialize()
         return self._bucket
     
     @property
     def asset_bucket_name(self):
-        self.initialize()
         return self._asset_bucket_name
     
     @property
     def gcs_dataset_dir(self):
-        self.initialize()
         return self._gcs_dataset_dir
     
     @property
     def gcs_result_dir(self):
-        self.initialize()
         return self._gcs_result_dir
     
     @property
     def vms_config_filename(self):
-        self.initialize()
         return self._vms_config_filename
     
     @property
     def vms_result_path(self):
-        self.initialize()
         return self._vms_result_path
     
     @property
     def runner_url(self):
-        self.initialize()
         return self._runner_url
+
+
+# Istanza singletone da far importare agli altri moduli
+resource_manager = ResourceManager()

@@ -16,6 +16,7 @@ class ResourceManager:
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
+        self.initialize()
 
     def initialize(self):
         if self._initialized:
@@ -38,21 +39,20 @@ class ResourceManager:
 
     @property
     def logger(self):
-        self.initialize()
         return self._logger
     
     @property
     def n_batches(self):
-        self.initialize()
         return self._n_batches
 
     @property
     def gcs_result_dir(self):
-        self.initialize()
         return self._gcs_result_dir
     
     @property
     def gcs_batch_result_dir(self):
-        self.initialize()
         return self._gcs_batch_result_dir
-    
+
+
+# Istanza singletone da far importare agli altri moduli
+resource_manager = ResourceManager()

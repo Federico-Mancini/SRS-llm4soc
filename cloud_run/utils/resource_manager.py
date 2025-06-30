@@ -27,6 +27,7 @@ class ResourceManager:
         self._gcs_batch_result_dir = "batch_results"
         self._vms_config_filename = "config.json"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
+        self.initialize()
 
     def initialize(self):
         if self._initialized:
@@ -61,70 +62,60 @@ class ResourceManager:
 
     @property
     def logger(self):
-        self.initialize()
         return self._logger
     
     @property
     def model(self):
-        self.initialize()
         return self._model
 
     @property
     def gen_conf(self):
-        self.initialize()
         return self._gen_conf
     
     @property
     def bucket(self):
-        self.initialize()
         return self._bucket
     
     @property
     def alerts_per_batch(self):
-        self.initialize()
         return self._alerts_per_batch
     
     @property
     def max_concurrent_requests(self):
-        self.initialize()
         return self._max_concurrent_requests
 
     @property
     def max_cache_age(self):
-        self.initialize()
         return self._max_cache_age
     
     @property
     def asset_bucket_name(self):
-        self.initialize()
         return self._asset_bucket_name
 
     @property
     def gcs_dataset_dir(self):
-        self.initialize()
         return self._gcs_dataset_dir
     
     @property
     def gcs_batch_dir(self):
-        self.initialize()
         return self._gcs_batch_dir
     
     @property
     def gcs_cache_dir(self):
-        self.initialize()
         return self._gcs_cache_dir
 
     @property
     def gcs_result_dir(self):
-        self.initialize()
         return self._gcs_result_dir
     
     @property
     def gcs_batch_result_dir(self):
-        self.initialize()
         return self._gcs_batch_result_dir
     
     @property
     def vms_config_filename(self):
-        self.initialize()
         return self._vms_config_filename
+
+
+# Istanza singletone da far importare agli altri moduli
+resource_manager = ResourceManager()

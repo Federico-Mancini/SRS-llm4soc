@@ -6,11 +6,8 @@ import utils.gcs_utils as gcs
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from utils.resource_manager import ResourceManager
+from utils.resource_manager import resource_manager as res
 from utils.auth_utils import call_runner
-
-
-res = ResourceManager()
 
 
 # --- API configuration -------------------------
@@ -44,9 +41,9 @@ async def check_status():
 
     except Exception as e:
         res.logger.error(f"[VMS][app][check_status] Unknown error: {e}")
-        status = f"errore: {str(e)}"
+        status = f"errore ({type(e)}): {str(e)}"
 
-    return {"API": "running", "runner": status}
+    return {"server (VMS)": "running", "runner (CRR)": status}
 
 
 # Visualizzazione file con alert classificati

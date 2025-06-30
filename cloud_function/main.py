@@ -3,10 +3,7 @@
 import json
 
 from google.cloud import storage
-from resource_manager import ResourceManager
-
-
-res = ResourceManager()
+from resource_manager import resource_manager as res
 
 
 # Merge single result files in one final 'result.json' (eseguita come Cloud Function al trigger di GCS, cioè ogni volta che un file 'result' viene creato)

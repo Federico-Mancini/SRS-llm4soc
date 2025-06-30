@@ -1,10 +1,7 @@
 import os
 
 from google.cloud import storage
-from utils.resource_manager import ResourceManager
-
-
-res = ResourceManager()
+from utils.resource_manager import resource_manager as res
 
 
 # Download file remoti
@@ -13,7 +10,7 @@ def download_from(folder: str, filename: str):
 
     # Creazione path
     local_path = os.path.join("assets", filename)
-    gcs_path = f"{folder}/{filename}"      # NB: rispettare il format GCS per le directory (niente punto iniziale e barra finale)
+    gcs_path = f"{folder}/{filename}" if folder else filename   # NB: rispettare il format GCS per le directory (niente punto iniziale e barra finale)
 
     # Connessione al bucket
     blob = storage.Client().bucket(res.asset_bucket_name).blob(gcs_path)
@@ -29,7 +26,7 @@ def download_from(folder: str, filename: str):
 def upload_to(folder: str, filename: str):
     # Creazione path
     local_path = os.path.join("assets", filename)
-    gcs_path = f"{folder}/{filename}"      # NB: rispettare il format GCS per le directory (niente punto iniziale e barra finale)
+    gcs_path = f"{folder}/{filename}" if folder else filename   # NB: rispettare il format GCS per le directory (niente punto iniziale e barra finale)
 
     # Controllo esistenza file locale
     if not os.path.isfile(local_path):

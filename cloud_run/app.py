@@ -5,11 +5,10 @@ import httpx
 import utils.gcs_utils as gcs
 
 from fastapi import FastAPI, Request, Query, HTTPException
-from utils.resource_manager import ResourceManager
+from utils.resource_manager import resource_manager as res
 from analyze_batch import analyze_single_alert, analyze_gcs_batch
 
 
-res = ResourceManager()
 app = FastAPI()
 
 
