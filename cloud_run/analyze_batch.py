@@ -113,7 +113,7 @@ async def analyze_gcs_batch(dataset_filename: str, batch_path: str) -> str:
 
         semaphore = asyncio.Semaphore(res.max_concurrent_requests)
 
-        ### START - Funzione interna per gestione cache
+        ### START - Funzione interna parallelizzata con asyncio (gestione cache)
         async def process_alert(i, alert) -> dict:
             cached = download_cache(alert_hash(alert))    # lettura cache
 

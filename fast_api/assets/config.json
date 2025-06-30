@@ -1,7 +1,7 @@
 {
   "n_batches": 3,
-  "alerts_per_batch": 10,
-  "max_concurrent_requests": 4,
+  "alerts_per_batch": 50,
+  "max_concurrent_requests": 8,
   "max_cache_age": 604800,
 
   "asset_bucket_name": "main-asset-storage",

@@ -1,7 +1,7 @@
 # CRR: Cloud Run Runner
 # (il runner va in "stand by" dopo un po'. A ogni primo utilizzo serve quindi inviargli una richiesta dummy per svegliarlo)
 
-import httpx
+import httpx, asyncio
 import utils.gcs_utils as gcs
 
 from fastapi import FastAPI, Request, Query, HTTPException
@@ -66,21 +66,46 @@ async def run_batch(dataset_filename: str = Query(...), batch_path: str = Query(
 @app.get("/run-dataset")
 async def run_dataset(dataset_filename: str = Query(...)):
     try:
+        # Svuotamento directory contenente i batch (pulizia da quelli pre-esistenti)
         gcs.empty_gcs_dir(res.gcs_batch_dir)
         res.logger.info(f"[CRR][app][run_dataset] Directory {res.gcs_batch_dir} emptied")
 
-        batch_paths = gcs.split_dataset(dataset_filename)   # restituisce la lista di nomi dei batch creati
+        # Suddivisione dataset in batch
+        batch_paths = gcs.split_dataset(dataset_filename)
 
+        # Richieste parallele di esecuzione dei batch
+        semaphore = asyncio.Semaphore(res.max_concurrent_requests)
         async with httpx.AsyncClient(timeout=60.0) as client:
-            for i, batch_path in enumerate(batch_paths):
-                response = await client.get(f"https://llm4soc-runner-url/run-batch?dataset_filename={dataset_filename}&batch_path={batch_path}")
 
-                if response.status_code != 200:
-                    res.logger.error(f"[CRR][app][run_dataset] Batch {i} failed: {response.text}")
-                    raise HTTPException(status_code=500, detail=f"Batch {i} failed")
+            ### START - Funzione interna parallelizzata con asyncio (gestione cache)
+            async def retransmit_req(batch_path: str, index: int):
+                url = (
+                    f"https://llm4soc-runner-url/run-batch"
+                    f"?dataset_filename={dataset_filename}&batch_path={batch_path}"
+                )
+
+                async with semaphore:
+                    try:
+                        response = await client.get(url)
+                        if response.status_code != 200:
+                            msg = f"[CRR][app][run_dataset] -> Batch {index} failed: {response.text}"
+                            res.logger.error(msg)
+                            raise HTTPException(status_code=500, detail=msg)
+                        
+                        return True
+                    
+                    except Exception as e:
+                        res.logger.error(f"[CRR][app][run_dataset] -> Batch {index} exception: {e}")
+                        raise
+
+            tasks = [retransmit_req(batch_path, i) for i, batch_path in enumerate(batch_paths)]
+            await asyncio.gather(*tasks)
+            ### END
 
         return {"message": "Analisi avviata con successo", "batches": batch_paths}
+        # NB: non attendo la fine dell'elaborazione dei batch, ma solo la loro generazione a seguito della suddivisione del dataset
 
     except Exception as e:
-        res.logger.error(f"[CRR][app][run_dataset] Unknown error ({type(e)}): {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        msg = f"[CRR][app][run_dataset] -> Unknown error ({type(e)}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)

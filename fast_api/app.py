@@ -105,15 +105,21 @@ async def chat(request: Request):
 # Caricamento dataset (.jsonl o .csv) su GCS
 @app.post("/upload-alerts")
 async def upload_alerts(file: UploadFile = File(...)):
+    # (se un file con lo stesso nome è già presente su GCS, viene sovrascritto)
+
     # Controllo estensione file ricevuto
     if not file.filename.endswith(".jsonl"):
         res.logger.warning(f"[VMS][app][upload_alerts] Invalid file extension: {file.filename}")
         raise HTTPException(status_code=400, detail="Formato file non supportato. Estensioni valide: jsonl")
     
     try:
-        gcs.upload_to(res.gcs_dataset_dir, file.filename)
-        res.logger.info(f"[VMS][app][upload_alerts] File {file.filename} uploaded")
-        
+        blob_path = f"{res.gcs_dataset_dir}/{file.filename}"
+        blob = res.bucket.blob(blob_path)
+
+        file_data = await file.read()
+        blob.upload_from_string(file_data, content_type=file.content_type)
+
+        res.logger.info(f"[VMS][app][upload_alerts] File {file.filename} uploaded to {blob_path}")
         return {"filename": file.filename, "message": "File caricato con successo"}
 
     except Exception as e:
@@ -122,7 +128,7 @@ async def upload_alerts(file: UploadFile = File(...)):
 
 
 # Analisi dataset remoto (già caricato su GCS)
-@app.post("/analyze-alerts")
+@app.get("/analyze-alerts")
 async def analyze_alerts(dataset_filename: str = Query(...)):
     try:        
         response = await call_runner(
