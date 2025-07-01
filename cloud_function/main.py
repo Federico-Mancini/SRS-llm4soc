@@ -54,10 +54,13 @@ def merge_handler(event, context):
                 res.logger.warning(f"[CRF][main][merge_handler] -> Failed to read file '{blob.name}' ({type(e)}.__name__): {str(e)}")
 
         # Upload file unificato su GCS
-        gcs_result_path = posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_result.json")
+        gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
         
         merged_blob = bucket.blob(gcs_result_path)
-        merged_blob.upload_from_string(json.dumps(merged, indent=2))
+        merged_blob.upload_from_string(
+            json.dumps(merged, indent=2),
+            content_type="application/json"
+        )
 
         res.logger.info(f"[CRF][main][merge_handler] -> {len(merged)} alerts saved in '{gcs_result_path}'")
 
