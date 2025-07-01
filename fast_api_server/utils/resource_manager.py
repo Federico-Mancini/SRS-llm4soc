@@ -13,7 +13,7 @@ class ResourceManager:
         self._initialized = False
         self._logger = logger
         self._bucket = None
-        self._alerts_per_batch = 50
+        self._alerts_per_batch = 100
         self._gcs_dataset_dir = "input_datasets"
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"

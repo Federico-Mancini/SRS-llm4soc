@@ -16,7 +16,7 @@ class ResourceManager:
         self._model = None
         self._gen_conf = None
         self._bucket = None
-        self._max_concurrent_requests = 8
+        self._max_concurrent_requests = 16
         self._max_cache_age = 60 * 60 * 24 * 7
         self._gcs_cache_dir = "cache"
         self._gcs_batch_result_dir = "batch_results"
