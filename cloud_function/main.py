@@ -48,4 +48,5 @@ def merge_handler(event, context):
         res.logger.info(f"[CRF][main][merge_handler] -> Temporary result files deleted")
 
     except Exception as e:
-        res.logger.error(f"[CRF][main][merge_handler] Unexpected error ({type(e)}): {str(e)}")
+        res.logger.error(f"[CRF][main][merge_handler] -> Error ({type(e)}): {str(e)}")
+        raise

@@ -20,7 +20,7 @@ class ResourceManager:
         self._max_concurrent_requests = 4
         self._max_cache_age = 60 * 60 * 24 * 7
         self._asset_bucket_name = "main-asset-storage"
-        self._gcs_dataset_dir = "input_datasets"
+        self._gcs_dataset_dir = "datasets"
         self._gcs_batch_dir = "input_batches"
         self._gcs_cache_dir = "cache"
         self._gcs_result_dir = "results"

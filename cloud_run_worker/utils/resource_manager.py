@@ -1,4 +1,5 @@
 import json
+import utils.vertexai_utils as vxc
 
 from google.cloud import storage
 from utils.logger_utils import logger
@@ -12,10 +13,12 @@ class ResourceManager:
     def __init__(self):
         self._initialized = False
         self._logger = logger
+        self._model = None
+        self._gen_conf = None
         self._bucket = None
         self._n_batches = 3
         self._max_concurrent_requests = 8
-        self._gcs_dataset_dir = "input_datasets"
+        self._gcs_dataset_dir = "datasets"
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
@@ -24,6 +27,11 @@ class ResourceManager:
     def initialize(self):
         if self._initialized:
             return
+        
+        # Inizializzazione Vertex AI
+        vxc.init()
+        self._model = vxc.get_model()
+        self._gen_conf = vxc.get_generation_config()
         
         # Connessione al bucket GCS
         self._bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
@@ -45,6 +53,15 @@ class ResourceManager:
     @property
     def logger(self):
         return self._logger
+    
+    @property
+    def model(self):
+        return self._model
+
+    @property
+    def gen_conf(self):
+        return self._gen_conf
+    
     
     @property
     def bucket(self):

@@ -1,7 +1,7 @@
 import json, time, asyncio
 import pandas as pd
 
-from cloud_run_worker.utils.resource_manager import resource_manager as res
+from utils.resource_manager import resource_manager as res
 from utils.cache_utils import alert_hash, cleanup_cache, download_cache, upload_cache
 
 
@@ -77,7 +77,7 @@ async def analyze_alert_async(i, alert, semaphore) -> dict:
             return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
 
 async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, batch_size: int) -> list[dict]:
-    res.logger.info(f"[CRW][analyze_data][analyze_batch] Processing batch {batch_id} containing {batch_size} alerts")
+    res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Processing batch {batch_id} containing {batch_size} alerts")
 
     try:
         cleanup_cache() # TODO: vedere se c'è un punto migliore in cui eseguire la pulizia della cache
@@ -105,7 +105,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, batch_size: int) 
         ### END
 
         # Creazione task asincroni, uno per alert
-        res.logger.info(f"[CRW][analyze_data][analyze_batch] Launching parallel analysis for {batch_size} alerts")
+        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Launching parallel analysis for {batch_size} alerts")
 
         alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]  # trasformazione di ogni record del dataframe in un oggetto json
         tasks = [process_alert(i, alert) for i, alert in enumerate(alerts, start=1)]
@@ -113,5 +113,5 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, batch_size: int) 
         return await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
 
     except Exception as e:
-        res.logger.error(f"[CRW][analyze_data][analyze_batch] Error in batch {batch_id} ({type(e)}): {str(e)}")
+        res.logger.error(f"[CRW][analyze_data][analyze_batch] -> Error in batch {batch_id} ({type(e)}): {str(e)}")
         raise
