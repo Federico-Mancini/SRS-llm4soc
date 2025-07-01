@@ -67,7 +67,7 @@ async def monitor_batch_results():
         count = 0
 
         for blob in result_blobs:
-            if blob.name.startswith("result_") and blob.name.endswith(".json"):
+            if blob.name.startswith("result_") and blob.name.endswith(".jsonl"):
                 count += 1
                 
         return {

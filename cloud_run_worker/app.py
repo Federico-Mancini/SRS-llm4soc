@@ -44,7 +44,7 @@ async def run_batch(request: Request):
     batch_result_list = await analyze_batch(batch_df, batch_id, batch_size)
 
     # Salvataggio risultati su GCS
-    batch_result_path = posixpath.join(res.gcs_batch_result_dir, f"result_{batch_id}.json")
+    batch_result_path = posixpath.join(res.gcs_batch_result_dir, f"result_{batch_id}.jsonl")
     result_blob = res.bucket.blob(batch_result_path)
     result_blob.upload_from_string(
         "\n".join(json.dumps(obj) for obj in batch_result_list),
