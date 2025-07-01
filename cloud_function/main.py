@@ -15,23 +15,28 @@ def merge_handler(event, context):
         # Estrazione dei batch result
         prefix = res.gcs_batch_result_dir + "/"
         blobs = list(bucket.list_blobs(prefix=prefix))
+        n_blobs = len(blobs)
+
+        if n_blobs == 0:
+            res.logger.warning(f"[CRF][main][merge_handler] -> No files found under prefix '{prefix}'")
+            return
 
         # Estrazione metadati
         dataset_name = os.path.basename(blobs[0].name).split("_result_")[0]     # nome dataset (presente in ognuno dei nomi dei file result)
         metadata_path = posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json")
         metadata_text = bucket.blob(metadata_path).download_as_text()
         metadata = json.loads(metadata_text)
-        n_batches = metadata.get("n_batches", -1)
+        n_batches = metadata.get("num_batches", -1)
 
         if n_batches < 0:
             res.logger.warning("[CRF][main][merge_handler] -> 'n_batches' is undefined in the configuration file on GCS")
             return
 
-        if len(blobs) < n_batches:
-            res.logger.debug(f"[CRF][main][merge_handler] -> Found only {len(blobs)}/{n_batches} files. Waiting for others...")
+        if n_blobs < n_batches:
+            res.logger.debug(f"[CRF][main][merge_handler] -> Found only {n_blobs}/{n_batches} files")
             return
         
-        res.logger.info(f"[CRF][main][merge_handler] -> Found {len(blobs)}/{n_batches} files. Now merging")
+        res.logger.info(f"[CRF][main][merge_handler] -> Found {n_blobs}/{n_batches} files. Now merging")
 
         # Unione dei file result temporanei
         merged = []
@@ -44,7 +49,6 @@ def merge_handler(event, context):
                 res.logger.warning(f"[CRF][main][merge_handler] -> Failed to read file '{blob.name}' ({type(e)}.__name__): {str(e)}")
 
         # Upload file unificato su GCS
-        dataset_name = blobs[0].name.replace(prefix, "").split("_result-")[0]
         gcs_result_path = posixpath.join(prefix, f"{dataset_name}_result.json")
         
         merged_blob = bucket.blob(gcs_result_path)

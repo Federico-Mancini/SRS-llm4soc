@@ -213,7 +213,8 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         # Estrazione metadati da dataset
         dataset_name = os.path.splitext(dataset_filename)[0]
         metadata_path = posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json")
-        metadata = res.bucket.blob(metadata_path).download_as_text()
+        metadata_text = res.bucket.blob(metadata_path).download_as_text()
+        metadata = json.loads(metadata_text)
         
         # Creazione e analisi dei singoli batch tramite Cloud Task
         enqueue_tasks(metadata)

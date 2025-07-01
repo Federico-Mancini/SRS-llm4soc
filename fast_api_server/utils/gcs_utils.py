@@ -53,7 +53,6 @@ def get_dataset_metadata(dataset_filename: str):
         "features": df.columns.tolist(),
         "num_batches": n_batches,
         "batch_size": batch_size,
-        "file_size_bytes": blob.size,
         "content_type": blob.content_type,
         "dataset_name": dataset_name,
         "dataset_path": gcs_dataset_path
