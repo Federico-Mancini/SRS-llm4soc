@@ -48,7 +48,7 @@ def read_root():
 async def check_status():
     try:
         data = await call_runner("GET", res.runner_url)
-        status = data.get("status", "unknown")
+        msg = data.get("status", "unknown")
 
     except Exception as e:
         msg = f"[VMS][app][check_status] -> Error ({type(e)}): {str(e)}"

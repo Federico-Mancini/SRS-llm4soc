@@ -1,6 +1,6 @@
 # CRW: Cloud Run Worker
 
-import json, posixpath
+import io, json, posixpath
 import pandas as pd
 
 from fastapi import FastAPI, Request
@@ -31,7 +31,7 @@ async def run_batch(request: Request):
     data = blob.download_as_text()
 
     # Carica e suddividi dataset
-    df = pd.read_json(pd.compat.StringIO(data), lines=True)
+    df = pd.read_json(io.StringIO(data), lines=True)
     batch_df = df.iloc[start_row:end_row]
 
     # Classificazione alert del batch

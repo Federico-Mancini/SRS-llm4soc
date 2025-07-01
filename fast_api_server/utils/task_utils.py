@@ -5,11 +5,9 @@ from utils.resource_manager import resource_manager as res
 
 
 # Invio richieste multiple di analisi batch al worker
-def enqueue_tasks(dataset_metadata: json):
+def enqueue_tasks(metadata: json):
     client = tasks_v2.CloudTasksClient()
     parent = client.queue_path(res.project_id, res.location, res.analysis_batch_queue_name)
-
-    metadata = json.loads(dataset_metadata)
 
     # Controllo ed estrazione campi
     required_fields = ["num_rows", "num_batches", "batch_size", "dataset_path"]
@@ -33,9 +31,12 @@ def enqueue_tasks(dataset_metadata: json):
         task = {
             "http_request": {
                 "http_method": tasks_v2.HttpMethod.POST,
-                "url": res.worker_url,
+                "url": f"{res.worker_url}/run-batch",
                 "headers": {"Content-Type": "application/json"},
-                "body": json.dumps(payload).encode()
+                "body": json.dumps(payload).encode(),
+                "oidc_token": {
+                    "service_account_email": res.vm_service_account_email
+                }
             }
         }
 

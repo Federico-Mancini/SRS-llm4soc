@@ -1,4 +1,4 @@
-import os, posixpath
+import os, io, posixpath
 import pandas as pd
 
 from google.cloud import storage
@@ -34,9 +34,9 @@ def get_dataset_metadata(dataset_filename: str):
 
     # Estrazione dati da file
     if file_format == '.csv':
-        df = pd.read_csv(pd.compat.StringIO(data))
+        df = pd.read_csv(io.StringIO(data))
     elif file_format == '.jsonl':
-        df = pd.read_json(pd.compat.StringIO(data), lines=True)
+        df = pd.read_json(io.StringIO(data), lines=True)
     else:
         msg = f"[VMS][gcs_utils][get_dataset_metadata] -> Invalid file format: '{file_format}' is not '.jsonl' or '.csv'"
         res.logger.warning(msg)

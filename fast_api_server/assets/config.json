@@ -23,5 +23,7 @@
   "analysis_batch_queue_name": "batch-analysis",
 
   "runner_url": "https://llm4soc-runner-870222336278.europe-west1.run.app",
-  "worker_url": "https://llm4soc-worker-870222336278.europe-west1.run.app"
+  "worker_url": "https://llm4soc-worker-870222336278.europe-west1.run.app",
+
+  "vm_service_account_email": "870222336278-compute@developer.gserviceaccount.com"
 }

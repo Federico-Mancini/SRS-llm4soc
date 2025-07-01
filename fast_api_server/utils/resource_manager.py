@@ -25,7 +25,8 @@ class ResourceManager:
         self._location = ""
         self._analysis_batch_queue_name = "batch-analysis"
         self._runner_url = ""
-        self._worker_url = "https://llm4soc-worker-870222336278.europe-west1.run.app"
+        self._worker_url = ""
+        self._vm_service_account_email = ""
         self.initialize()
 
     def initialize(self):
@@ -52,6 +53,7 @@ class ResourceManager:
         self._analysis_batch_queue_name = conf.get("analysis_batch_queue_name", self._analysis_batch_queue_name)
         self._runner_url = conf.get("runner_url", self._runner_url)
         self._worker_url = conf.get("worker_url", self._worker_url)
+        self._vm_service_account_email = conf.get("vm_service_account_email", self._vm_service_account_email)
 
         self._initialized = True
         self._logger.info("[VMS][resource_manager][initialize] Initialization completed")
@@ -124,6 +126,10 @@ class ResourceManager:
     @property
     def worker_url(self):
         return self._worker_url
+
+    @property
+    def vm_service_account_email(self):
+        return self._vm_service_account_email
 
 
 # Istanza singletone da far importare agli altri moduli
