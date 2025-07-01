@@ -79,10 +79,11 @@ async def monitor_batch_results():
                     metadata = gcs.get_metadata(dataset_name)
         
         batches = metadata.get("num_batches") if metadata else -1
+        status = "pending" if count == 0 else "partial" if count < batches else "completed"
         completion_rate = f"{count}/{batches} batches analyzed" if batches > 0 else "n/a"
 
         return {
-            "status": "partial" if count > 0 else "pending",
+            "status": status,
             "completion_rate": completion_rate,
             "dataset_name": dataset_name or "n/a"
         }
@@ -114,7 +115,8 @@ async def chat(request: Request):
 
 
 # Upload dataset (.jsonl o .csv) e relativi metadati su GCS
-@app.post("/upload-dataset")    # NOTA! nome endpoint cambiato dall'ultima volta.
+# NB: se si cambia 'alerts_per_batch' sul 'config.json' locale alla VM, va fatta una richiesta ad '/upload-dataset' per aggiornare anche il corrispondente valore salvato come metadato del dataset su GCS
+@app.post("/upload-dataset")
 async def upload_alerts(file: UploadFile = File(...)):
     # NB: se un file con lo stesso nome è già presente su GCS, viene sovrascritto
     dataset_filename = file.filename
@@ -142,9 +144,10 @@ async def upload_alerts(file: UploadFile = File(...)):
         res.logger.info(f"[VMS][app][upload_alerts] -> Metadata file '{metadata_filename}' uploaded to '{metadata_path}'")
 
         return {
-            "dataset": dataset_path,
-            "metadata": metadata_path,
-            "message": "File e metadati caricati con successo"
+            "status": "completed",
+            "dataset_path": dataset_path,
+            "metadata_path": metadata_path,
+            "metadata": metadata
         }
     
     except Exception as e:

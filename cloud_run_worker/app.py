@@ -1,14 +1,18 @@
 # CRW: Cloud Run Worker
 
-import io, json, posixpath
+import io, json, asyncio, posixpath
 import pandas as pd
 
 from fastapi import FastAPI, HTTPException, Request
+from concurrent.futures import ThreadPoolExecutor
 from utils.resource_manager import resource_manager as res
 from analyze_data import analyze_one_alert, analyze_batch, analyze_batch_cached
 
 
 app = FastAPI()
+
+executor = ThreadPoolExecutor(max_workers=16)
+asyncio.get_event_loop().set_default_executor(executor) # aumento del limite massimo di thread concorrenti di asyncio
 
 
 # Endpoint dedicato alla ricezione di richieste anomale dirette alla root del worker
