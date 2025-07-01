@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from utils.resource_manager import resource_manager as res
+from utils.task_utils import enqueue_tasks
 from utils.auth_utils import call_runner
 
 
@@ -22,8 +23,18 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    gcs.upload_to("", res.vms_config_filename)    # ad ogni avvio carico il file 'config.json' su GCS
     res.logger.info("[VMS][app][startup_event] -> Virtual Machine Server - Status: running")
+
+    path = res.vms_config_path
+    if not os.path.isfile(path):
+        msg = f"[VMS][app][startup_event] -> Config file '{path}' not found. Aborting startup"
+        res.logger.error(msg)
+        raise RuntimeError(msg)
+    
+    blob = res.bucket.blob(res.config_filename)
+    blob.upload_from_filename(path)
+
+    res.logger.info(f"[VMS][app][startup_event] -> File '{path}' uploaded to GCS as '/{res.config_filename}'")
 
 
 # --- Endpoints ---------------------------------
@@ -46,13 +57,21 @@ async def check_status():
     return {"server (VMS)": "running", "runner (CRR)": status}
 
 
+# TODO: da rimuovere
 # Download del batch log
-@app.get("/check-batch-log")
+@app.get("/batch-log")
 async def get_batch_log():
     try:
-        gcs.download_from("", "batch_log.json")
+        blob = res.bucket.blob("batch_log.json")
+        
+        if not blob.exists():
+            res.logger.warning("[VMS][app][get_batch_log] batch_log.json not found in GCS")
+            raise HTTPException(status_code=404, detail="batch_log.json not found")
 
-        return {"message": "done"}
+        log_data = json.loads(blob.download_as_text())
+
+        res.logger.info("[VMS][app][get_batch_log] batch_log.json retrieved successfully")
+        return {"logs": log_data}
 
     except Exception as e:
         res.logger.error(f"[VMS][app][get_batch_log] Failed to download batch_log.json: {e}")
@@ -94,6 +113,7 @@ def get_result(dataset_filename: str = Query(...)):
         raise HTTPException(status_code=500, detail=f"Errore nella lettura del file {res.vms_result_path} ({type(e)}): {str(e)}")
 
 
+# Classificazione di singolo alert
 @app.post("/chat")
 async def chat(request: Request):
     try:
@@ -116,7 +136,7 @@ async def chat(request: Request):
 
 
 # Caricamento dataset (.jsonl o .csv) su GCS
-@app.post("/upload-alerts")
+@app.post("/upload-alerts") #TODO: modificare in "/upload-dataset" (dirlo anche a samu)
 async def upload_alerts(file: UploadFile = File(...)):
     # (se un file con lo stesso nome è già presente su GCS, viene sovrascritto)
 
@@ -140,13 +160,15 @@ async def upload_alerts(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Errore nel caricamento del file: {str(e)}")
 
 
+# TODO: da rimuovere
 # Analisi dataset remoto (già caricato su GCS)
 @app.get("/analyze-alerts")
 async def analyze_alerts(dataset_filename: str = Query(...)):
     try:        
         response = await call_runner(
             method="GET",
-            url=f"{res.runner_url}/run-dataset?dataset_filename={dataset_filename}"
+            url=f"{res.runner_url}/run-dataset?dataset_filename={dataset_filename}",
+            timeout=180.0   # 3 min (tempo massimo di suddivisione in batch di dataset medio-piccoli)
         )
 
         res.logger.info("[VMS][app][analyze_alerts] -> Request sent to the runner")
@@ -164,3 +186,26 @@ async def analyze_alerts(dataset_filename: str = Query(...)):
 #              [U] invio nome dataset a /analyze-alerts -> [VMS] invio nome dataset a /run-dataset -> [CRR] analisi dataset = restituzione esito operazione d'avviamento analisi
 #              NB: il CRR si occupa automaticamente di suddividere il dataset in batch, di analizzare questi uno ad uno, alert dopo alert;
 #                  gli alert classificati sono poi raggruppati per batch e salvati in file "result-batchID.json" temporanei, in attesa che la CRF li unisca nel file finale "result.json".
+
+
+# Analisi dataset remoto (già caricato su GCS)
+@app.get("/analyze-dataset")
+async def analyze_dataset(dataset_filename: str = Query(...)):
+    try:
+        # Pulizia e preparazione
+        gcs.empty_dir(res.gcs_batch_result_dir) # svuotamento directory destinata ai risultati di analisi batch (fatto anche dalla CRF)
+
+        # Estrazione metadati da dataset
+        metadata = gcs.get_dataset_metadata(dataset_filename)
+        enqueue_tasks(metadata)     # creazione e analisi dei singoli batch
+
+        return {
+            "status": "analysis started",
+            "message": "Metadata extracted successfully. Batch slicing has been started in the background",
+            "metadata": metadata
+        }
+    
+    except Exception as e:
+        msg = f"[VMS][app][analyze_dataset] -> Error ({type(e)}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)

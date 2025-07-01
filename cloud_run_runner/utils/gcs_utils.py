@@ -1,4 +1,6 @@
-import os, io, json
+import os, io, json, posixpath
+import pandas as pd
+
 from utils.resource_manager import resource_manager as res
 
 
@@ -27,46 +29,6 @@ def update_config_value(key: str, value):
 
     blob.upload_from_string(json.dumps(config, indent=2))
 
-
-# Suddivisione del dataset su GCS in singoli batch
-# def split_dataset(dataset_filename: str):
-#     gcs_dataset_path = f"{res.gcs_dataset_dir}/{dataset_filename}"
-#     blob = res.bucket.blob(gcs_dataset_path)
-
-#     if not blob.exists():
-#         res.logger.error(f"[CRR][gcs_utils][split_dataset] File {gcs_dataset_path} not found in bucket {res.asset_bucket_name}")
-#         raise FileNotFoundError(f"File {gcs_dataset_path} not found in bucket {res.asset_bucket_name}")
-
-#     # Download e conteggio degli alert
-#     data = blob.download_as_text()
-#     lines = [line for line in data.splitlines() if line.strip()]
-#     total = len(lines)
-
-#     # Calcololo del numero di batch
-#     n_batches = max(1, (total + res.alerts_per_batch - 1) // res.alerts_per_batch)  # arrotondamento per eccesso
-#     res.logger.info(f"[CRR][gcs_utils][split_dataset] Splitting {total} alerts from {gcs_dataset_path} into {n_batches} batches")
-
-#     update_config_value("n_batches", n_batches)     # aggiornamento variabile d'ambiente condivisa su GCS
-
-#     # Parsing JSON e suddivisione dataset
-#     alerts = [json.loads(line) for line in lines]
-#     batch_size = max(1, total // n_batches)
-
-#     dataset_name = os.path.splitext(dataset_filename)[0]
-
-#     for i in range(n_batches):
-#         #start = i * batch_size
-#         #end = None if i == n_batches - 1 else (i + 1) * batch_size
-#         #batch = alerts[start : end]
-#         batch = alerts[i * batch_size : None if i == n_batches - 1 else (i + 1) * batch_size]
-
-#         out_path = f"{res.gcs_batch_dir}/{dataset_name}_batch_{i}.jsonl"
-#         content = "\n".join(json.dumps(entry) for entry in batch)
-#         res.bucket.blob(out_path).upload_from_string(content)
-
-#         #res.logger.debug(f"[CRR][gcs_utils][split_dataset] Batch {i} saved to {out_path} ({len(batch)} alerts)")
-
-#     return [f"{res.gcs_batch_dir}/{dataset_name}_batch_{i}.jsonl" for i in range(n_batches)]
 
 def split_dataset(dataset_filename: str):
     # Connessione al bucket
@@ -111,3 +73,46 @@ def split_dataset(dataset_filename: str):
 
     res.logger.info(f"[CRR][gcs_utils][split_dataset] -> Generation of {n_batches} batches completed")
     return batch_paths
+
+
+# Calcolo metadati di un dataset remoto
+def get_dataset_metadata(dataset_filename: str):
+    gcs_dataset_path = posixpath.join(res.gcs_dataset_dir, dataset_filename)
+    dataset_name, file_format = os.path.splitext(dataset_filename)
+
+    # Download dati da GCS
+    blob = res.bucket.blob(gcs_dataset_path)
+
+    if not blob.exists():
+        msg = f"[CRR][gcs_utils][get_dataset_metadata] -> File '{gcs_dataset_path}' not found in '{gcs_dataset_path}'"
+        res.logger.warning(msg)
+        raise FileNotFoundError(msg)
+
+    data = blob.download_as_text()
+
+    # Estrazione dati da file
+    if file_format == '.csv':
+        df = pd.read_csv(pd.compat.StringIO(data))
+    elif file_format == '.jsonl':
+        df = pd.read_json(pd.compat.StringIO(data), lines=True)
+    else:
+        msg = f"[CRR][gcs_utils][get_dataset_metadata] -> Invalid file format: {file_format} is not '.jsonl' or '.csv'"
+        res.logger.warning(msg)
+        raise ValueError(msg)
+
+    # Conteggio batch da generare
+    num_rows = df.shape[0]
+    batch_size = res.alerts_per_batch
+    n_batches = max(1, (num_rows + batch_size - 1) // batch_size)
+
+    return {
+        "num_rows": num_rows,
+        "num_columns": df.shape[1],
+        "features": df.columns.tolist(),
+        "num_batches": n_batches,
+        "batch_size": batch_size,
+        "file_size_bytes": blob.size,
+        "content_type": blob.content_type,
+        "dataset_name": dataset_name,
+        "dataset_path": gcs_dataset_path
+    }

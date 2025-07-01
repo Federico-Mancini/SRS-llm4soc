@@ -3,7 +3,7 @@ options:
 
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  dir: 'cloud_run'
+  dir: 'cloud_run_runner'
   args: ['build', '-t', 'europe-west1-docker.pkg.dev/gruppo-4-456912/llm4soc-runner-repo/llm4soc-runner', '.']
 
 - name: 'gcr.io/cloud-builders/docker'

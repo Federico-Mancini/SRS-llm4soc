@@ -32,7 +32,7 @@ async def call_runner(method: str, url: str, json: dict = None, timeout: float =
             else:
                 raise ValueError("Metodo HTTP non supportato")
             
-            res.logger.info(f"[VMS][auth_utils][call_runner] {response.status_code} - {response.text}")
+            res.logger.info(f"[VMS][auth_utils][call_runner] {response.text}")
             
             response.raise_for_status()
             return response.json()

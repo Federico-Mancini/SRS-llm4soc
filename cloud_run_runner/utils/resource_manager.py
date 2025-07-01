@@ -26,7 +26,11 @@ class ResourceManager:
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
         self._vms_config_filename = "config.json"
+        self._project_id = ""
+        self._location = ""
+        self._analysis_batch_queue_name = "batch-analysis"
         self._runner_url = "https://llm4soc-runner-870222336278.europe-west1.run.app"
+        self._worker_url = "https://llm4soc-worker-870222336278.europe-west1.run.app"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
         self.initialize()
 
@@ -56,7 +60,11 @@ class ResourceManager:
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
         self._vms_config_filename = conf.get("vms_config_filename", self._vms_config_filename)
+        self._project_id = conf.get("project_id", self._project_id)
+        self._location = conf.get("location", self._location)
+        self._analysis_batch_queue_name = conf.get("analysis_batch_queue_name", self._analysis_batch_queue_name)
         self._runner_url = conf.get("runner_url", self._runner_url)
+        self._worker_url = conf.get("worker_url", self._worker_url)
 
         self._initialized = True
         self._logger.info("[CRR][resource_manager][initialize] Initialization completed")
@@ -119,8 +127,24 @@ class ResourceManager:
         return self._vms_config_filename
 
     @property
+    def project_id(self):
+        return self._project_id
+    
+    @property
+    def location(self):
+        return self._location
+
+    @property
+    def analysis_batch_queue_name(self):
+        return self._analysis_batch_queue_name
+    
+    @property
     def runner_url(self):
         return self._runner_url
+
+    @property
+    def worker_url(self):
+        return self._worker_url
 
 
 # Istanza singletone da far importare agli altri moduli

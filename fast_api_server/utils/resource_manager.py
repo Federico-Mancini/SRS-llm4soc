@@ -16,9 +16,14 @@ class ResourceManager:
         self._asset_bucket_name = "main-asset-storage"
         self._gcs_dataset_dir = "input_datasets"
         self._gcs_result_dir = "results"
-        self._vms_config_filename = "config.json"
+        self._config_filename = "config.json"
+        self._vms_config_path = "assets/config.json"
         self._vms_result_path = "assets/result.json"
-        self._runner_url = ""   # per sicurezza, valore di default vuoto
+        self._project_id = ""
+        self._location = ""
+        self._analysis_batch_queue_name = "batch-analysis"
+        self._runner_url = ""
+        self._worker_url = "https://llm4soc-worker-870222336278.europe-west1.run.app"
         self.initialize()
 
     def initialize(self):
@@ -35,9 +40,14 @@ class ResourceManager:
         self._asset_bucket_name = conf.get("asset_bucket_name", self._asset_bucket_name)
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
-        self._vms_config_filename = conf.get("vms_config_filename", self._vms_config_filename)
+        self._config_filename = conf.get("config_filename", self._config_filename)
+        self._vms_config_path = conf.get("vms_config_path", self._vms_config_path)
         self._vms_result_path = conf.get("vms_result_path", self._vms_result_path)
+        self._project_id = conf.get("project_id", self._project_id)
+        self._location = conf.get("location", self._location)
+        self._analysis_batch_queue_name = conf.get("analysis_batch_queue_name", self._analysis_batch_queue_name)
         self._runner_url = conf.get("runner_url", self._runner_url)
+        self._worker_url = conf.get("worker_url", self._worker_url)
 
         self._initialized = True
         self._logger.info("[VMS][resource_manager][initialize] Initialization completed")
@@ -72,16 +82,36 @@ class ResourceManager:
         return self._gcs_result_dir
     
     @property
-    def vms_config_filename(self):
-        return self._vms_config_filename
+    def config_filename(self):
+        return self._config_filename
+    
+    @property
+    def vms_config_path(self):
+        return self._vms_config_path
     
     @property
     def vms_result_path(self):
         return self._vms_result_path
     
     @property
+    def project_id(self):
+        return self._project_id
+    
+    @property
+    def location(self):
+        return self._location
+
+    @property
+    def analysis_batch_queue_name(self):
+        return self._analysis_batch_queue_name
+    
+    @property
     def runner_url(self):
         return self._runner_url
+
+    @property
+    def worker_url(self):
+        return self._worker_url
 
 
 # Istanza singletone da far importare agli altri moduli

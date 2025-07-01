@@ -5,19 +5,23 @@
   "max_cache_age": 604800,
 
   "asset_bucket_name": "main-asset-storage",
-  "gcs_dataset_dir": "input_datasets",
-  "gcs_batch_dir": "input_batches",
+  "gcs_dataset_dir": "datasets",
   "gcs_cache_dir": "cache",
   "gcs_result_dir": "results",
   "gcs_batch_result_dir": "batch_results",
 
-  "vms_config_filename": "config.json",
-  "vms_result_filename": "result.json",
+  "config_filename": "config.json",
+  "result_filename": "result.json",
+
+  "vms_config_path": "assets/config.json",
   "vms_result_path": "assets/result.json",
 
   "project_id": "gruppo-4-456912",
   "location": "europe-west1",
   "model_name": "gemini-2.0-flash-001",
 
-  "runner_url": "https://llm4soc-runner-870222336278.europe-west1.run.app"
+  "analysis_batch_queue_name": "batch-analysis",
+
+  "runner_url": "https://llm4soc-runner-870222336278.europe-west1.run.app",
+  "worker_url": "https://llm4soc-worker-870222336278.europe-west1.run.app"
 }

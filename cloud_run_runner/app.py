@@ -1,8 +1,9 @@
 # CRR: Cloud Run Runner
 # (il runner va in "stand by" dopo un po'. A ogni primo utilizzo serve quindi inviargli una richiesta dummy per svegliarlo)
 
-import json, httpx, asyncio
+import json, asyncio
 import utils.gcs_utils as gcs
+import utils.task_utils as tsk
 
 from fastapi import FastAPI, Request, Query, HTTPException
 from utils.resource_manager import resource_manager as res
@@ -62,13 +63,13 @@ async def run_batch(dataset_filename: str = Query(...), batch_path: str = Query(
 
 # Analisi di un dataset remoto (nome file GCS passato tramite richiesta)
 # NB: la risposta è restituita non appena viene inviata la richiesta d'analisi dell'ultimo batch
-# STEP: svuotamento directory batch -> suddivisione in batch -> analisi di batch -> analisi degli alert di ogni batch -> restituzione risultati in file separati per batch -> (cloud trigger) merge in unico 'result.json'
+# STEP: svuotamento directory batch e result -> suddivisione in batch -> analisi di batch -> analisi degli alert di ogni batch -> restituzione risultati in file separati per batch -> (cloud trigger) merge in unico 'result.json'
 @app.get("/run-dataset")
 async def run_dataset(dataset_filename: str = Query(...)):
     try:
         # Pulizia e preparazione
-        gcs.empty_gcs_dir(res.gcs_batch_dir)
-        gcs.empty_gcs_dir(res.gcs_batch_result_dir)
+        gcs.empty_gcs_dir(res.gcs_batch_dir)            # svuotamento directory destinata ai batch
+        gcs.empty_gcs_dir(res.gcs_batch_result_dir)     # svuotamento directory destinata ai risultati di analisi batch (fatto anche dalla CRF)
 
         # Suddivisione dataset in batch
         batch_paths = gcs.split_dataset(dataset_filename)
@@ -77,6 +78,7 @@ async def run_dataset(dataset_filename: str = Query(...)):
         # Lista dei risultati per il file di log
         log_entries = []
 
+        ### START - Funzione parallelizzata per analisi batch
         async def retransmit_req(batch_path: str, index: int):    
             async with semaphore:
                 try:
@@ -90,8 +92,9 @@ async def run_dataset(dataset_filename: str = Query(...)):
                         "status": "error",
                         "detail": f"{e.response.status_code} {e.response.reason_phrase}"
                     })
+        ### END
 
-        # Funzione background per invio richieste e salvataggio log
+        ### START - Funzione background per invio richieste e salvataggio log
         async def launch_batches_and_log():
             tasks = [
                 retransmit_req(batch_path, i)
@@ -103,6 +106,7 @@ async def run_dataset(dataset_filename: str = Query(...)):
             log_path = f"batch_log.json"
             res.bucket.blob(log_path).upload_from_string(json.dumps(log_entries, indent=2))
             res.logger.info(f"[CRR][app][run_dataset] -> Batch log uploaded into {log_path}")
+        ### END
 
         # Lancio del task asincrono in background
         asyncio.create_task(launch_batches_and_log())
@@ -115,3 +119,27 @@ async def run_dataset(dataset_filename: str = Query(...)):
         msg = f"[CRR][app][run_dataset] -> Unknown error ({type(e)}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
+
+
+# (endpoint spostato direttamente su VMS)
+# @app.get("/run-dataset-2")
+# async def run_dataset_2(dataset_filename: str = Query(...)):
+#     try:
+#         # Pulizia e preparazione
+#         #gcs.empty_gcs_dir(res.gcs_batch_dir)            # svuotamento directory destinata ai batch
+#         gcs.empty_gcs_dir(res.gcs_batch_result_dir)     # svuotamento directory destinata ai risultati di analisi batch (fatto anche dalla CRF)
+
+#         # Estrazione metadati da dataset
+#         metadata = gcs.get_dataset_metadata(dataset_filename)
+#         tsk.enqueue_slicing_tasks(metadata)
+
+#         return {
+#             "status": "analysis started",
+#             "message": "Metadata extracted successfully. Batch slicing has been started in the background",
+#             "metadata": metadata
+#         }
+    
+#     except Exception as e:
+#         msg = f"[CRR][app][run_dataset_2] -> Error ({type(e)}): {str(e)}"
+#         res.logger.error(msg)
+#         raise HTTPException(status_code=500, detail=msg)
