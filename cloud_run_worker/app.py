@@ -5,7 +5,7 @@ import pandas as pd
 
 from fastapi import FastAPI, HTTPException, Request
 from utils.resource_manager import resource_manager as res
-from analyze_data import analyze_batch_sync, analyze_batch_sync_with_cache, analyze_batch, analyze_batch_cached
+from analyze_data import analyze_batch, analyze_batch_cached
 
 
 app = FastAPI()
