@@ -3,3 +3,4 @@ fastapi
 uvicorn[standard]
 google-cloud-storage
 google-cloud-aiplatform
+google-cloud-tasks
