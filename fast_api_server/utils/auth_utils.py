@@ -13,7 +13,7 @@ def get_auth_header(audience_url: str) -> dict:
         return {"Authorization": f"Bearer {token}"}
     
     except Exception as e:
-        res.logger.error(f"[VMS][auth_utils][get_auth_header] Failed to create authentication header: {e}")
+        res.logger.error(f"[VMS][auth_utils][get_auth_header] -> Failed to create authentication header: {str(e)}")
         raise
 
 
@@ -32,19 +32,19 @@ async def call_runner(method: str, url: str, json: dict = None, timeout: float =
             else:
                 raise ValueError("Metodo HTTP non supportato")
             
-            res.logger.info(f"[VMS][auth_utils][call_runner] {response.text}")
+            res.logger.info(f"[VMS][auth_utils][call_runner] -> {response.text}")
             
             response.raise_for_status()
             return response.json()
 
     except httpx.RequestError as e:
-        res.logger.error(f"[VMS][auth_utils][call_runner] Connection error ({type(e)}): {str(e)}")
+        res.logger.error(f"[VMS][auth_utils][call_runner] -> Connection error ({type(e)}): {str(e)}")
         raise
 
     except httpx.HTTPStatusError as e:
-        res.logger.error(f"[VMS][auth_utils][call_runner] Invalid HTTP response ({type(e)}): {str(e)}")
+        res.logger.error(f"[VMS][auth_utils][call_runner] -> Invalid HTTP response ({type(e)}): {str(e)}")
         raise
 
     except Exception as e:
-        res.logger.error(f"[VMS][auth_utils][call_runner] Unknown error ({type(e)}): {str(e)}")
+        res.logger.error(f"[VMS][auth_utils][call_runner] -> Error ({type(e)}): {str(e)}")
         raise

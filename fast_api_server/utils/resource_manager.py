@@ -13,9 +13,11 @@ class ResourceManager:
         self._initialized = False
         self._logger = logger
         self._bucket = None
+        self._alerts_per_batch = 50
         self._asset_bucket_name = "main-asset-storage"
         self._gcs_dataset_dir = "input_datasets"
         self._gcs_result_dir = "results"
+        self._gcs_batch_result_dir = "batch_results"
         self._config_filename = "config.json"
         self._vms_config_path = "assets/config.json"
         self._vms_result_path = "assets/result.json"
@@ -37,9 +39,11 @@ class ResourceManager:
         conf = self.get_config()
 
         # Variabili d'ambiente condivise su GCS
+        self._alerts_per_batch = conf.get("alerts_per_batch", self._alerts_per_batch)
         self._asset_bucket_name = conf.get("asset_bucket_name", self._asset_bucket_name)
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
+        self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
         self._config_filename = conf.get("config_filename", self._config_filename)
         self._vms_config_path = conf.get("vms_config_path", self._vms_config_path)
         self._vms_result_path = conf.get("vms_result_path", self._vms_result_path)
@@ -70,6 +74,10 @@ class ResourceManager:
         return self._bucket
     
     @property
+    def alerts_per_batch(self):
+        return self._alerts_per_batch
+    
+    @property   # D
     def asset_bucket_name(self):
         return self._asset_bucket_name
     
@@ -80,6 +88,10 @@ class ResourceManager:
     @property
     def gcs_result_dir(self):
         return self._gcs_result_dir
+    
+    @property
+    def gcs_batch_result_dir(self):
+        return self._gcs_batch_result_dir
     
     @property
     def config_filename(self):

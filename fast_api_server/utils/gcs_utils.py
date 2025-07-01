@@ -14,7 +14,7 @@ def empty_dir(gcs_dir: str):
         blob.delete()
         count += 1
     
-    res.logger.info(f"[VMS][gcs_utils][empty_gcs_dir] {count} files deleted from {gcs_dir}/")
+    res.logger.info(f"[VMS][gcs_utils][empty_gcs_dir] {count} files deleted from '{gcs_dir}/'")
 
 
 # Calcolo metadati di un dataset remoto
@@ -38,7 +38,7 @@ def get_dataset_metadata(dataset_filename: str):
     elif file_format == '.jsonl':
         df = pd.read_json(pd.compat.StringIO(data), lines=True)
     else:
-        msg = f"[VMS][gcs_utils][get_dataset_metadata] -> Invalid file format: {file_format} is not '.jsonl' or '.csv'"
+        msg = f"[VMS][gcs_utils][get_dataset_metadata] -> Invalid file format: '{file_format}' is not '.jsonl' or '.csv'"
         res.logger.warning(msg)
         raise ValueError(msg)
 

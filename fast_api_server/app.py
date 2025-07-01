@@ -1,6 +1,6 @@
 # VMS: Virtual Machine Server
 
-import os ,json
+import os ,json, posixpath
 import utils.gcs_utils as gcs
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query
@@ -51,10 +51,11 @@ async def check_status():
         status = data.get("status", "unknown")
 
     except Exception as e:
-        res.logger.error(f"[VMS][app][check_status] -> Unknown error: {e}")
-        status = f"errore ({type(e)}): {str(e)}"
+        msg = f"[VMS][app][check_status] -> Error ({type(e)}): {str(e)}"
+        res.logger.error(msg)
 
-    return {"server (VMS)": "running", "runner (CRR)": status}
+    return {"server (VMS)": "running", "runner (CRR)": msg}
+    # TODO: una volta eliminato il CRR, sostituirlo qui con chiamata al CRW
 
 
 # TODO: da rimuovere
@@ -82,35 +83,41 @@ async def get_batch_log():
 @app.get("/result")
 def get_result(dataset_filename: str = Query(...)):
     dataset_name = os.path.splitext(dataset_filename)[0]
-    gcs_result_path = f"{res.gcs_result_dir}/{dataset_name}_result.json"
-    blob = res.bucket.blob(gcs_result_path)
+    gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
     
     # Controllo esistenza file remoto
+    blob = res.bucket.blob(gcs_result_path)
+    
     if not blob.exists():
-        res.logger.warning(f"[VMS][app][get_result] -> File {gcs_result_path} not found")
-        raise HTTPException(status_code=404, detail=f"File {gcs_result_path} non trovato")
+        msg = f"[VMS][app][get_result] -> File '{gcs_result_path}' not found"
+        res.logger.warning(msg)
+        raise HTTPException(status_code=404, detail=msg)
 
+    # Download file in locale
     blob.download_to_filename(res.vms_result_path)
 
-    # Controllo esito download in locale
     if not os.path.exists(res.vms_result_path):
-        res.logger.warning(f"[VMS][app][get_result] -> Downloaded file {res.vms_result_path} not found")
-        raise HTTPException(status_code=404, detail=f"File scaricato {res.vms_result_path} non trovato")
+        msg = f"[VMS][app][get_result] -> Downloaded file not found locally in '{res.vms_result_path}'"
+        res.logger.warning(msg)
+        raise HTTPException(status_code=404, detail=msg)
     
+    # Lettura dati
     try:
         with open(res.vms_result_path, "r") as f:
             data = json.load(f)
 
-        res.logger.info(f"[VMS][app][get_result] -> File {res.vms_result_path} read")
+        res.logger.info(f"[VMS][app][get_result] -> File '{res.vms_result_path}' read")
         return data
     
     except json.JSONDecodeError:
-        res.logger.error(f"[VMS][app][get_result] -> Failed to parse {res.vms_result_path} ({type(e)}): {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Errore nel parsing del file {res.vms_result_path} ({type(e)}): {str(e)}")
+        msg = f"[VMS][app][get_result] -> Failed to parse '{res.vms_result_path}' ({type(e)}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
     
     except Exception as e:
-        res.logger.error(f"[VMS][app][get_result] -> Failed to read {res.vms_result_path} ({type(e)}): {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Errore nella lettura del file {res.vms_result_path} ({type(e)}): {str(e)}")
+        msg = f"[VMS][app][get_result] -> Failed to read '{res.vms_result_path}' ({type(e)}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
 
 
 # Classificazione di singolo alert
@@ -125,10 +132,8 @@ async def chat(request: Request):
             json={"alert": alert_json}
         )
 
-        res.logger.info("[VMS][app][chat] -> Request sent to the runner")
-
     except Exception as e:
-        msg = f"[VMS][app][chat] -> Failed to send alert data ({type(e)}): {str(e)}"
+        msg = f"[VMS][app][chat] -> Failed to send request ({type(e)}): {str(e)}"
         res.logger.error(msg)
         return {"explanation": msg}
     
@@ -141,23 +146,25 @@ async def upload_alerts(file: UploadFile = File(...)):
     # (se un file con lo stesso nome è già presente su GCS, viene sovrascritto)
 
     # Controllo estensione file ricevuto
-    if not file.filename.endswith(".jsonl", ".csv"):
-        res.logger.warning(f"[VMS][app][upload_alerts] -> Invalid file extension: {file.filename}")
-        raise HTTPException(status_code=400, detail="Formato file non supportato. Estensioni valide: jsonl, csv")
+    if not file.filename.endswith((".jsonl", ".csv")):
+        msg = f"[VMS][app][upload_alerts] -> Invalid file format: '{file.filename}' is not '.jsonl' or '.csv'"
+        res.logger.warning(msg)
+        raise HTTPException(status_code=400, detail=msg)
     
     try:
-        blob_path = f"{res.gcs_dataset_dir}/{file.filename}"
+        blob_path = posixpath.join(res.gcs_dataset_dir, file.filename)
         blob = res.bucket.blob(blob_path)
 
         file_data = await file.read()
         blob.upload_from_string(file_data, content_type=file.content_type)
 
-        res.logger.info(f"[VMS][app][upload_alerts] -> File {file.filename} uploaded to {blob_path}")
+        res.logger.info(f"[VMS][app][upload_alerts] -> File '{file.filename}' uploaded to '{blob_path}'")
         return {"filename": file.filename, "message": "File caricato con successo"}
 
     except Exception as e:
-        res.logger.error(f"[VMS][app][upload_alerts] -> Failed to upload ({type(e)}): {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Errore nel caricamento del file: {str(e)}")
+        msg = f"[VMS][app][upload_alerts] -> Failed to upload '{file.filename}' ({type(e)}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
 
 
 # TODO: da rimuovere
@@ -179,16 +186,8 @@ async def analyze_alerts(dataset_filename: str = Query(...)):
     
     return response
 
-# Flusso di operazioni:
-# 1) Check   = [U] invio GET a /check-status -> [VMS] invio GET a / (root) = restituzione stato di VMS e CRR
-# 2) Chat    = [U] invio alert a /chat -> [VMS] invio alert a /run-alert -> [CRR] analisi singolo alert = restituzione alert classificato
-# 3) Dataset = [U] invio file dataset a /upload-alerts = restituzione esito operazione di caricamento file
-#              [U] invio nome dataset a /analyze-alerts -> [VMS] invio nome dataset a /run-dataset -> [CRR] analisi dataset = restituzione esito operazione d'avviamento analisi
-#              NB: il CRR si occupa automaticamente di suddividere il dataset in batch, di analizzare questi uno ad uno, alert dopo alert;
-#                  gli alert classificati sono poi raggruppati per batch e salvati in file "result-batchID.json" temporanei, in attesa che la CRF li unisca nel file finale "result.json".
 
-
-# Analisi dataset remoto (già caricato su GCS)
+# Analisi dataset remoto (già caricato su GCS tramite '/upload-alerts')
 @app.get("/analyze-dataset")
 async def analyze_dataset(dataset_filename: str = Query(...)):
     try:

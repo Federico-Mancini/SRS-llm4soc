@@ -18,7 +18,9 @@ class ResourceManager:
         self._bucket = None
         self._n_batches = 3
         self._max_concurrent_requests = 8
+        self._max_cache_age = 60 * 60 * 24 * 7
         self._gcs_dataset_dir = "datasets"
+        self._gcs_cache_dir = "cache"
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
@@ -42,7 +44,9 @@ class ResourceManager:
         # Variabili d'ambiente condivise su GCS
         self._n_batches = conf.get("n_batches", self._n_batches)
         self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
+        self._max_cache_age = conf.get("max_cache_age", self._max_cache_age)
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
+        self._gcs_cache_dir = conf.get("gcs_cache_dir", self._gcs_cache_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
 
@@ -67,19 +71,27 @@ class ResourceManager:
     def bucket(self):
         return self._bucket
     
-    @property
+    @property   # D
     def n_batches(self):
         return self._n_batches
     
     @property
     def max_concurrent_requests(self):
         return self._max_concurrent_requests
-
+    
     @property
+    def max_cache_age(self):
+        return self._max_cache_age
+
+    @property   # D
     def gcs_dataset_dir(self):
         return self._gcs_dataset_dir
     
     @property
+    def gcs_cache_dir(self):
+        return self._gcs_cache_dir
+    
+    @property   # D
     def gcs_result_dir(self):
         return self._gcs_result_dir
     

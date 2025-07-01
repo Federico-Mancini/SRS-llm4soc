@@ -26,7 +26,7 @@ def init():
 # Load the generative model
 def get_model() -> GenerativeModel:
     try:
-        logger.info(f"Loading model '{MODEL_NAME}'")
+        logger.info(f"[CRW][vertexai_utils][get_model] -> Loading model '{MODEL_NAME}'")
         model = GenerativeModel(MODEL_NAME)
 
         return model
