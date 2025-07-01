@@ -13,6 +13,7 @@ class ResourceManager:
         self._initialized = False
         self._logger = logger
         self._bucket = None
+        self._n_batches = -1
         self._alerts_per_batch = 50
         self._asset_bucket_name = "main-asset-storage"
         self._gcs_dataset_dir = "input_datasets"
@@ -40,6 +41,7 @@ class ResourceManager:
         conf = self.get_config()
 
         # Variabili d'ambiente condivise su GCS
+        self._n_batches = conf.get("n_batches", self._n_batches)
         self._alerts_per_batch = conf.get("alerts_per_batch", self._alerts_per_batch)
         self._asset_bucket_name = conf.get("asset_bucket_name", self._asset_bucket_name)
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
@@ -74,6 +76,10 @@ class ResourceManager:
     @property
     def bucket(self):
         return self._bucket
+    
+    @property
+    def n_batches(self):
+        return self._n_batches
     
     @property
     def alerts_per_batch(self):

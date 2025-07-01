@@ -3,12 +3,18 @@
 import io, json, posixpath
 import pandas as pd
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from utils.resource_manager import resource_manager as res
 from analyze_data import analyze_batch
 
 
 app = FastAPI()
+
+
+# Endpoint dedicato alla ricezione di richieste anomale dirette alla root del worker
+@app.api_route("/", methods=["GET", "POST"])
+async def block_root():
+    raise HTTPException(status_code=404, detail="Invalid endpoint")
 
 
 # Ricezione richieste d'analisi del batch i-esimo

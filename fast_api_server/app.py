@@ -51,32 +51,35 @@ async def check_status():
         msg = data.get("status", "unknown")
 
     except Exception as e:
-        msg = f"[VMS][app][check_status] -> Error ({type(e)}): {str(e)}"
+        msg = f"[VMS][app][check_status] -> Error ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
 
     return {"server (VMS)": "running", "runner (CRR)": msg}
     # TODO: una volta eliminato il CRR, sostituirlo qui con chiamata al CRW
 
 
-# TODO: da rimuovere
-# Download del batch log
-@app.get("/batch-log")
-async def get_batch_log():
+# Check numero di file result temporanei creati finora
+@app.get("/monitor-batch-results")
+async def monitor_batch_results():
     try:
-        blob = res.bucket.blob("batch_log.json")
-        
-        if not blob.exists():
-            res.logger.warning("[VMS][app][get_batch_log] batch_log.json not found in GCS")
-            raise HTTPException(status_code=404, detail="batch_log.json not found")
+        result_blobs = res.bucket.list_blobs(prefix=res.gcs_batch_result_dir + "/")
+        batches = res.n_batches
+        count = 0
 
-        log_data = json.loads(blob.download_as_text())
-
-        res.logger.info("[VMS][app][get_batch_log] batch_log.json retrieved successfully")
-        return {"logs": log_data}
+        for blob in result_blobs:
+            if blob.name.startswith("result_") and blob.name.endswith(".json"):
+                count += 1
+                
+        return {
+            "status": "partial" if count > 0 else "pending",
+            "batches_completed": count,
+            "batches_to_be_done": batches-count if batches > 0 else "Warning! 'n_batches' is still in its default state (-1)"
+        }
 
     except Exception as e:
-        res.logger.error(f"[VMS][app][get_batch_log] Failed to download batch_log.json: {e}")
-        raise HTTPException(status_code=500, detail="Errore durante il download del file")
+        msg = f"[VMS][app][monitor_batch_results] -> Error ({type(e).__name__}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
 
 
 # Visualizzazione file con alert classificati
@@ -110,12 +113,12 @@ def get_result(dataset_filename: str = Query(...)):
         return data
     
     except json.JSONDecodeError:
-        msg = f"[VMS][app][get_result] -> Failed to parse '{res.vms_result_path}' ({type(e)}): {str(e)}"
+        msg = f"[VMS][app][get_result] -> Failed to parse '{res.vms_result_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
     
     except Exception as e:
-        msg = f"[VMS][app][get_result] -> Failed to read '{res.vms_result_path}' ({type(e)}): {str(e)}"
+        msg = f"[VMS][app][get_result] -> Failed to read '{res.vms_result_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
@@ -133,7 +136,7 @@ async def chat(request: Request):
         )
 
     except Exception as e:
-        msg = f"[VMS][app][chat] -> Failed to send request ({type(e)}): {str(e)}"
+        msg = f"[VMS][app][chat] -> Failed to send request ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         return {"explanation": msg}
     
@@ -141,7 +144,7 @@ async def chat(request: Request):
 
 
 # Caricamento dataset (.jsonl o .csv) su GCS
-@app.post("/upload-alerts") #TODO: modificare in "/upload-dataset" (dirlo anche a samu)
+@app.post("/upload-dataset")    # NOTA! nome endpoint cambiato dall'ultima volta.
 async def upload_alerts(file: UploadFile = File(...)):
     # (se un file con lo stesso nome è già presente su GCS, viene sovrascritto)
 
@@ -162,29 +165,29 @@ async def upload_alerts(file: UploadFile = File(...)):
         return {"filename": file.filename, "message": "File caricato con successo"}
 
     except Exception as e:
-        msg = f"[VMS][app][upload_alerts] -> Failed to upload '{file.filename}' ({type(e)}): {str(e)}"
+        msg = f"[VMS][app][upload_alerts] -> Failed to upload '{file.filename}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
 
 # TODO: da rimuovere
 # Analisi dataset remoto (già caricato su GCS)
-@app.get("/analyze-alerts")
-async def analyze_alerts(dataset_filename: str = Query(...)):
-    try:        
-        response = await call_runner(
-            method="GET",
-            url=f"{res.runner_url}/run-dataset?dataset_filename={dataset_filename}",
-            timeout=180.0   # 3 min (tempo massimo di suddivisione in batch di dataset medio-piccoli)
-        )
+# @app.get("/analyze-alerts")
+# async def analyze_alerts(dataset_filename: str = Query(...)):
+#     try:        
+#         response = await call_runner(
+#             method="GET",
+#             url=f"{res.runner_url}/run-dataset?dataset_filename={dataset_filename}",
+#             timeout=180.0   # 3 min (tempo massimo di suddivisione in batch di dataset medio-piccoli)
+#         )
 
-        res.logger.info("[VMS][app][analyze_alerts] -> Request sent to the runner")
+#         res.logger.info("[VMS][app][analyze_alerts] -> Request sent to the runner")
 
-    except Exception as e:
-        res.logger.error(f"[VMS][app][analyze_alerts] -> Failed to send request ({type(e)}): {str(e)}")
-        return {"message": f"Errore sconosciuto ({type(e)}): {str(e)}"}
+#     except Exception as e:
+#         res.logger.error(f"[VMS][app][analyze_alerts] -> Failed to send request ({type(e)}): {str(e)}")
+#         return {"message": f"Errore sconosciuto ({type(e)}): {str(e)}"}
     
-    return response
+#     return response
 
 
 # Analisi dataset remoto (già caricato su GCS tramite '/upload-alerts')
@@ -205,6 +208,6 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         }
     
     except Exception as e:
-        msg = f"[VMS][app][analyze_dataset] -> Error ({type(e)}): {str(e)}"
+        msg = f"[VMS][app][analyze_dataset] -> Error ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)

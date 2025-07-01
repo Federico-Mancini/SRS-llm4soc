@@ -12,7 +12,7 @@ class ResourceManager:
     def __init__(self):
         self._initialized = False
         self._logger = logger
-        self._n_batches = 3
+        self._n_batches = -1    # valore usato per indicare estrazione dati non ancora avvenuta
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)

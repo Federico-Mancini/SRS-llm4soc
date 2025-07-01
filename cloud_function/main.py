@@ -16,6 +16,10 @@ def merge_handler(event, context):
         # Estrazione di tutti i file batch
         blobs = list(bucket.list_blobs(prefix=f"{res.gcs_batch_result_dir}/"))
 
+        if res.n_batches < 0:
+            print("")
+            # TODO: implemenatre codice per gestire caso
+
         if len(blobs) < res.n_batches:
             res.logger.debug(f"[CRF][main][merge_handler] -> Found only {len(blobs)}/{res.n_batches} files. Waiting for others...")
             return
@@ -31,7 +35,7 @@ def merge_handler(event, context):
                     merged.extend(data)
                     
             except Exception as e:
-                res.logger.warning(f"[CRF][main][merge_handler] -> Failed to read file {blob.name} ({type(e)}): {str(e)}")
+                res.logger.warning(f"[CRF][main][merge_handler] -> Failed to read file '{blob.name}' ({type(e)}.__name__): {str(e)}")
 
         # Caricamento di file unificato su GCS
         dataset_name = blobs[0].name.replace(f"{res.gcs_batch_result_dir}/", "").split("_result-")[0]
@@ -39,7 +43,7 @@ def merge_handler(event, context):
         merged_blob = bucket.blob(gcs_result_path)
         merged_blob.upload_from_string(json.dumps(merged, indent=2))
 
-        res.logger.info(f"[CRF][main][merge_handler] -> {len(merged)} alerts saved in {gcs_result_path}")
+        res.logger.info(f"[CRF][main][merge_handler] -> {len(merged)} alerts saved in '{gcs_result_path}'")
 
         # Rimozione file temporanei
         for blob in blobs:
@@ -48,5 +52,5 @@ def merge_handler(event, context):
         res.logger.info(f"[CRF][main][merge_handler] -> Temporary result files deleted")
 
     except Exception as e:
-        res.logger.error(f"[CRF][main][merge_handler] -> Error ({type(e)}): {str(e)}")
+        res.logger.error(f"[CRF][main][merge_handler] -> Error ({type(e).__name__}): {str(e)}")
         raise

@@ -105,7 +105,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, batch_size: int) 
         ### END
 
         # Creazione task asincroni, uno per alert
-        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Launching parallel analysis for {batch_size} alerts")
+        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Launching {res.max_concurrent_requests} parallel analysis for {batch_size} alerts")
 
         alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]  # trasformazione di ogni record del dataframe in un oggetto json
         tasks = [process_alert(i, alert) for i, alert in enumerate(alerts, start=1)]
@@ -113,5 +113,5 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, batch_size: int) 
         return await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
 
     except Exception as e:
-        res.logger.error(f"[CRW][analyze_data][analyze_batch] -> Error in batch {batch_id} ({type(e)}): {str(e)}")
+        res.logger.error(f"[CRW][analyze_data][analyze_batch] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
         raise

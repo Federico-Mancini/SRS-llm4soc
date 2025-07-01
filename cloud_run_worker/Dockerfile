@@ -5,7 +5,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Copia file locali in '/app'
-COPY . /app
+COPY . .
 
 # Installa dipendenze
 RUN pip install --upgrade pip
