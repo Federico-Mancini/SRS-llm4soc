@@ -18,7 +18,7 @@ def get_auth_header(audience_url: str) -> dict:
 
 
 # Gestore chiamate al runner su Cloud Run
-async def call_runner(method: str, url: str, json: dict = None, timeout: float = 50.0) -> dict:
+async def call_worker(method: str, url: str, json: dict = None, timeout: float = 50.0) -> dict:
     headers = get_auth_header(url)
 
     try:
@@ -32,19 +32,19 @@ async def call_runner(method: str, url: str, json: dict = None, timeout: float =
             else:
                 raise ValueError("Metodo HTTP non supportato")
             
-            res.logger.info(f"[VMS][auth_utils][call_runner] -> {response.text}")
+            res.logger.info(f"[VMS][auth_utils][call_worker] -> {response.text}")
             
             response.raise_for_status()
             return response.json()
 
     except httpx.RequestError as e:
-        res.logger.error(f"[VMS][auth_utils][call_runner] -> Connection error ({type(e)}): {str(e)}")
+        res.logger.error(f"[VMS][auth_utils][call_worker] -> Connection error ({type(e).__name__}): {str(e)}")
         raise
 
     except httpx.HTTPStatusError as e:
-        res.logger.error(f"[VMS][auth_utils][call_runner] -> Invalid HTTP response ({type(e)}): {str(e)}")
+        res.logger.error(f"[VMS][auth_utils][call_worker] -> Invalid HTTP response ({type(e).__name__}): {str(e)}")
         raise
 
     except Exception as e:
-        res.logger.error(f"[VMS][auth_utils][call_runner] -> Error ({type(e)}): {str(e)}")
+        res.logger.error(f"[VMS][auth_utils][call_worker] -> Error ({type(e).__name__}): {str(e)}")
         raise

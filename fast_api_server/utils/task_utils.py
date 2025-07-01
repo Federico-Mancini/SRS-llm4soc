@@ -4,10 +4,10 @@ from google.cloud import tasks_v2
 from utils.resource_manager import resource_manager as res
 
 
-# Invio richieste multiple di analisi batch al worker
+# Invio richieste multiple per l'analisi degli alert che compongono il batch
 def enqueue_tasks(metadata: json):
     client = tasks_v2.CloudTasksClient()
-    parent = client.queue_path(res.project_id, res.location, res.analysis_batch_queue_name)
+    parent = client.queue_path(res.project_id, res.location, res.batch_analysis_queue_name)
 
     # Controllo ed estrazione campi
     required_fields = ["num_rows", "num_batches", "batch_size", "dataset_name", "dataset_path"]

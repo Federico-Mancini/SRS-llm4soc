@@ -20,7 +20,7 @@
   "location": "europe-west1",
   "model_name": "gemini-2.0-flash-001",
 
-  "analysis_batch_queue_name": "batch-analysis",
+  "batch_analysis_queue_name": "batch-analysis",
 
   "runner_url": "https://llm4soc-runner-870222336278.europe-west1.run.app",
   "worker_url": "https://llm4soc-worker-870222336278.europe-west1.run.app",

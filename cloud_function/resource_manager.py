@@ -5,7 +5,6 @@ from logger_utils import logger
 
 
 ASSET_BUCKET_NAME = "main-asset-storage"
-TMP_ASSET_BUCKET_NAME = "tmp-asset-storage"
 CONFIG_FILENAME = "config.json"
 
 
@@ -13,7 +12,6 @@ class ResourceManager:
     def __init__(self):
         self._initialized = False
         self._logger = logger
-        self._tmp_bucket = None
         self._gcs_dataset_dir = "datasets"
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
@@ -26,7 +24,6 @@ class ResourceManager:
         
         # Connessione ai bucket GCS
         self._bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
-        self._tmp_bucket = storage.Client().bucket(TMP_ASSET_BUCKET_NAME)
 
         # Download variabili d'ambiente condivise su GCS
         conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
@@ -43,10 +40,6 @@ class ResourceManager:
     @property
     def logger(self):
         return self._logger
-    
-    @property
-    def tmp_bucket(self):
-        return self._tmp_bucket
 
     @property
     def gcs_dataset_dir(self):

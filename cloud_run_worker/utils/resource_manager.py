@@ -6,7 +6,6 @@ from utils.logger_utils import logger
 
 
 ASSET_BUCKET_NAME = "main-asset-storage"
-TMP_ASSET_BUCKET_NAME = "tmp-asset-storage"
 CONFIG_FILENAME = "config.json"
 
 
@@ -17,13 +16,9 @@ class ResourceManager:
         self._model = None
         self._gen_conf = None
         self._bucket = None
-        self._tmp_bucket = None
-        self._n_batches = 3
         self._max_concurrent_requests = 8
         self._max_cache_age = 60 * 60 * 24 * 7
-        self._gcs_dataset_dir = "datasets"
         self._gcs_cache_dir = "cache"
-        self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
         self.initialize()
@@ -39,18 +34,14 @@ class ResourceManager:
         
         # Connessione ai bucket GCS
         self._bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
-        self._tmp_bucket = storage.Client().bucket(TMP_ASSET_BUCKET_NAME)
 
         # Download variabili d'ambiente condivise su GCS
         conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
 
         # Variabili d'ambiente condivise su GCS
-        self._n_batches = conf.get("n_batches", self._n_batches)
         self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
         self._max_cache_age = conf.get("max_cache_age", self._max_cache_age)
-        self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_cache_dir = conf.get("gcs_cache_dir", self._gcs_cache_dir)
-        self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
 
         self._initialized = True
@@ -69,18 +60,9 @@ class ResourceManager:
     def gen_conf(self):
         return self._gen_conf
     
-    
     @property
     def bucket(self):
         return self._bucket
-    
-    @property
-    def tmp_bucket(self):
-        return self._tmp_bucket
-    
-    @property   # D
-    def n_batches(self):
-        return self._n_batches
     
     @property
     def max_concurrent_requests(self):
@@ -89,18 +71,10 @@ class ResourceManager:
     @property
     def max_cache_age(self):
         return self._max_cache_age
-
-    @property   # D
-    def gcs_dataset_dir(self):
-        return self._gcs_dataset_dir
     
     @property
     def gcs_cache_dir(self):
         return self._gcs_cache_dir
-    
-    @property   # D
-    def gcs_result_dir(self):
-        return self._gcs_result_dir
     
     @property
     def gcs_batch_result_dir(self):

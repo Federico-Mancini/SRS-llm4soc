@@ -15,7 +15,6 @@ class ResourceManager:
         self._bucket = None
         self._n_batches = -1
         self._alerts_per_batch = 50
-        self._asset_bucket_name = "main-asset-storage"
         self._gcs_dataset_dir = "input_datasets"
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
@@ -24,7 +23,7 @@ class ResourceManager:
         self._vms_result_path = "assets/result.json"
         self._project_id = ""
         self._location = ""
-        self._analysis_batch_queue_name = "batch-analysis"
+        self._batch_analysis_queue_name = "batch-analysis"
         self._runner_url = ""
         self._worker_url = ""
         self._vm_service_account_email = ""
@@ -43,7 +42,6 @@ class ResourceManager:
         # Variabili d'ambiente condivise su GCS
         self._n_batches = conf.get("n_batches", self._n_batches)
         self._alerts_per_batch = conf.get("alerts_per_batch", self._alerts_per_batch)
-        self._asset_bucket_name = conf.get("asset_bucket_name", self._asset_bucket_name)
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
@@ -52,7 +50,7 @@ class ResourceManager:
         self._vms_result_path = conf.get("vms_result_path", self._vms_result_path)
         self._project_id = conf.get("project_id", self._project_id)
         self._location = conf.get("location", self._location)
-        self._analysis_batch_queue_name = conf.get("analysis_batch_queue_name", self._analysis_batch_queue_name)
+        self._batch_analysis_queue_name = conf.get("batch_analysis_queue_name", self._batch_analysis_queue_name)
         self._runner_url = conf.get("runner_url", self._runner_url)
         self._worker_url = conf.get("worker_url", self._worker_url)
         self._vm_service_account_email = conf.get("vm_service_account_email", self._vm_service_account_email)
@@ -84,10 +82,6 @@ class ResourceManager:
     @property
     def alerts_per_batch(self):
         return self._alerts_per_batch
-    
-    @property   # D
-    def asset_bucket_name(self):
-        return self._asset_bucket_name
     
     @property
     def gcs_dataset_dir(self):
@@ -122,8 +116,8 @@ class ResourceManager:
         return self._location
 
     @property
-    def analysis_batch_queue_name(self):
-        return self._analysis_batch_queue_name
+    def batch_analysis_queue_name(self):
+        return self._batch_analysis_queue_name
     
     @property
     def runner_url(self):

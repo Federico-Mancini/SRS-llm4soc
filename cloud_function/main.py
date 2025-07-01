@@ -62,9 +62,7 @@ def merge_handler(event, context):
 
         # Upload file unificato su GCS
         gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
-        
-        merged_blob = bucket.blob(gcs_result_path)
-        merged_blob.upload_from_string(
+        bucket.blob(gcs_result_path).upload_from_string(
             json.dumps(merged_alerts, indent=2),
             content_type="application/json"
         )

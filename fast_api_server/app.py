@@ -8,10 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from utils.resource_manager import resource_manager as res
 from utils.task_utils import enqueue_tasks
-from utils.auth_utils import call_runner
+from utils.auth_utils import call_worker
 
 
-# --- API configuration -------------------------
+# --- API configuration ---------------------------------------------------------------------------
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -37,28 +37,27 @@ async def startup_event():
     res.logger.info(f"[VMS][app][startup_event] -> File '{path}' uploaded to GCS as '/{res.config_filename}'")
 
 
-# --- Endpoints ---------------------------------
-@app.get("/")
-def read_root():
-    return {"status": "running"}
+# --- Endpoints -----------------------------------------------------------------------------------
+@app.api_route("/", methods=["GET", "POST"])
+async def block_root():
+    raise HTTPException(status_code=404, detail="Invalid endpoint")
 
 
 # Check di stato di API e runner
 @app.get("/check-status")
 async def check_status():
     try:
-        data = await call_runner("GET", res.runner_url)
+        data = await call_worker("GET", res.worker_url)
         msg = data.get("status", "unknown")
 
     except Exception as e:
         msg = f"[VMS][app][check_status] -> Error ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
 
-    return {"server (VMS)": "running", "runner (CRR)": msg}
-    # TODO: una volta eliminato il CRR, sostituirlo qui con chiamata al CRW
+    return {"server (VMS)": "running", "worker (CRW)": msg}
 
 
-# Check numero di file result temporanei creati finora
+# Check numero di file result temporanei creati fino al momento della chiamata
 @app.get("/monitor-batch-results")
 async def monitor_batch_results():
     try:
@@ -82,68 +81,27 @@ async def monitor_batch_results():
         raise HTTPException(status_code=500, detail=msg)
 
 
-# Visualizzazione file con alert classificati
-@app.get("/result")
-def get_result(dataset_filename: str = Query(...)):
-    dataset_name = os.path.splitext(dataset_filename)[0]
-    gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
-    
-    # Controllo esistenza file remoto
-    blob = res.bucket.blob(gcs_result_path)
-    
-    if not blob.exists():
-        msg = f"[VMS][app][get_result] -> File '{gcs_result_path}' not found"
-        res.logger.warning(msg)
-        raise HTTPException(status_code=404, detail=msg)
-
-    # Download file in locale
-    blob.download_to_filename(res.vms_result_path)
-
-    if not os.path.exists(res.vms_result_path):
-        msg = f"[VMS][app][get_result] -> Downloaded file not found locally in '{res.vms_result_path}'"
-        res.logger.warning(msg)
-        raise HTTPException(status_code=404, detail=msg)
-    
-    # Lettura dati
-    try:
-        with open(res.vms_result_path, "r") as f:
-            data = json.load(f)
-
-        res.logger.info(f"[VMS][app][get_result] -> File '{res.vms_result_path}' read")
-        return data
-    
-    except json.JSONDecodeError:
-        msg = f"[VMS][app][get_result] -> Failed to parse '{res.vms_result_path}' ({type(e).__name__}): {str(e)}"
-        res.logger.error(msg)
-        raise HTTPException(status_code=500, detail=msg)
-    
-    except Exception as e:
-        msg = f"[VMS][app][get_result] -> Failed to read '{res.vms_result_path}' ({type(e).__name__}): {str(e)}"
-        res.logger.error(msg)
-        raise HTTPException(status_code=500, detail=msg)
-
-
-# Classificazione di singolo alert
+# Analisi singolo alert
 @app.post("/chat")
 async def chat(request: Request):
     try:
         alert_json = await request.json()
-        
-        result = await call_runner(
+
+        result = await call_worker(
             method="POST",
-            url=f"{res.runner_url}/run-alert",
+            url=f"{res.worker_url}/run-alert",
             json={"alert": alert_json}
         )
+
+        return {"explanation": result["explanation"] or "Undefined 'explanation' field"}
 
     except Exception as e:
         msg = f"[VMS][app][chat] -> Failed to send request ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
-        return {"explanation": msg}
-    
-    return {"explanation": result["explanation"]}
+        raise HTTPException(status_code=500, detail=msg)
 
 
-# Caricamento dataset (.jsonl o .csv) e relativi metadati su GCS
+# Upload dataset (.jsonl o .csv) e relativi metadati su GCS
 @app.post("/upload-dataset")    # NOTA! nome endpoint cambiato dall'ultima volta.
 async def upload_alerts(file: UploadFile = File(...)):
     # NB: se un file con lo stesso nome è già presente su GCS, viene sovrascritto
@@ -207,5 +165,46 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
     
     except Exception as e:
         msg = f"[VMS][app][analyze_dataset] -> Error ({type(e).__name__}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
+
+
+# Visualizzazione file con alert classificati
+@app.get("/result")
+def get_result(dataset_filename: str = Query(...)):
+    dataset_name = os.path.splitext(dataset_filename)[0]
+    gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
+    
+    # Controllo esistenza file remoto
+    blob = res.bucket.blob(gcs_result_path)
+    
+    if not blob.exists():
+        msg = f"[VMS][app][get_result] -> File '{gcs_result_path}' not found"
+        res.logger.warning(msg)
+        raise HTTPException(status_code=404, detail=msg)
+
+    # Download file in locale
+    blob.download_to_filename(res.vms_result_path)
+
+    if not os.path.exists(res.vms_result_path):
+        msg = f"[VMS][app][get_result] -> Downloaded file not found locally in '{res.vms_result_path}'"
+        res.logger.warning(msg)
+        raise HTTPException(status_code=404, detail=msg)
+    
+    # Lettura dati
+    try:
+        with open(res.vms_result_path, "r") as f:
+            data = json.load(f)
+
+        res.logger.info(f"[VMS][app][get_result] -> File '{res.vms_result_path}' read")
+        return data
+    
+    except json.JSONDecodeError:
+        msg = f"[VMS][app][get_result] -> Failed to parse '{res.vms_result_path}' ({type(e).__name__}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
+    
+    except Exception as e:
+        msg = f"[VMS][app][get_result] -> Failed to read '{res.vms_result_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)

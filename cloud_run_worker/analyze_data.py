@@ -45,37 +45,66 @@ def build_prompt_optimized(alert) -> str:
         'ALERT:{json.dumps(alert, separators=(",", ":"))}\nRisposta:'
     """
 
-def build_alert_entry(i, t, c, e) -> dict:
-    return {
-        "id": i,
-        "timestamp": t,
-        "class": c,
-        "explanation": e
-    }
 
+# Interpretazione risposta Gemini & costruzione JSON da restituire
+def process_model_response(text: str, alert: dict, alert_id: int = 0) -> dict:
+    text = text.strip()
 
-async def analyze_alert(i, alert, semaphore) -> dict:
+    if "{" in text and "}" in text:
+        text = text[text.find("{"):text.rfind("}") + 1]  # pulizia testo Gemini
+
+    try:
+        parsed = json.loads(text)
+        return {
+            "id": alert_id,
+            "timestamp": alert.get("time", "n/a"),
+            "class": parsed.get("class", "error"),
+            "explanation": parsed.get("explanation", "Nessuna spiegazione")
+        }
+    
+    except json.JSONDecodeError:
+        return {
+            "id": alert_id,
+            "timestamp": alert.get("time", "n/a"),
+            "class": "error",
+            "explanation": f"Output non valido: {text}"
+        }
+
+# Analisi alert per l'endpoint '/chat'
+def analyze_one_alert(alert) -> dict:
     prompt = build_prompt(alert)
 
+    try:
+        response = res.model.generate_content(prompt, generation_config=res.gen_conf)
+        return process_model_response(response.text, alert)
+    
+    except Exception as e:
+        return {
+            "id": 0,
+            "timestamp": alert.get("time", "n/a"),
+            "class": "error",
+            "explanation": f"{type(e).__name__}: {str(e)}"
+        }
+
+# Analisi asincrona i-esimo alert di batch
+async def analyze_batch_alert(i, alert, semaphore) -> dict:
+    prompt = build_prompt(alert)
+    
     async with semaphore:
         try:
             response = await asyncio.to_thread(res.model.generate_content, prompt, generation_config=res.gen_conf)
-            text = response.text.strip()
-
-            if "{" in text and "}" in text:
-                text = text[text.find("{") : text.rfind("}") + 1]   # pulizia testo Gemini
-
-            try:
-                parsed = json.loads(text)
-                return build_alert_entry(i, alert.get("time", "n/a"), parsed.get("class", "error"), parsed.get("explanation", "Nessuna spiegazione"))
-
-            except json.JSONDecodeError:
-                return build_alert_entry(i, alert.get("time", "n/a"), "error", f"Output non valido: {text}")
-
+            return process_model_response(response.text, alert, i)
+        
         except Exception as e:
-            return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
+            return {
+                "id": i,
+                "timestamp": alert.get("time", "n/a"),
+                "class": "error",
+                "explanation": f"{type(e).__name__}: {str(e)}"
+            }
 
-async def analyze_batch(batch_df: pd.DataFrame, batch_id: int) -> list[dict]:
+# Analisi asincrona di batch
+async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int) -> list[dict]:
     res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
     start_time = time.time()
 
@@ -90,7 +119,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int) -> list[dict]:
 
         # Parallelizzazione delle analisi sugli alert
         tasks = [
-            analyze_alert(i, alert, semaphore)
+            analyze_batch_alert(start_row + i, alert, semaphore)
             for i, alert in enumerate(alerts, start=1)
         ]
 
@@ -102,7 +131,8 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int) -> list[dict]:
         res.logger.error(f"[CRW][analyze_data][analyze_batch] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
         raise
 
-async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int) -> list[dict]:
+# Analisi asincrona di batch con gestione cache
+async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row: int) -> list[dict]:
     res.logger.info(f"[CRW][analyze_data][analyze_batch_cached] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
     start_time = time.time()
 
@@ -126,7 +156,7 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int) -> list[di
             if h in existing_cache_hashes:
                 result = download_cache(h)
             else:
-                result = await analyze_alert(i, alert, semaphore)
+                result = await analyze_batch_alert(i, alert, semaphore)
 
                 # Salvataggio cache
                 upload_cache(h, {
@@ -141,7 +171,7 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int) -> list[di
 
         # Creazione task asincroni, uno per alert
         alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]  # trasformazione di ogni record del dataframe in un oggetto json
-        tasks = [process_alert(i, alert) for i, alert in enumerate(alerts, start=1)]
+        tasks = [process_alert(start_row + i, alert) for i, alert in enumerate(alerts, start=1)]
 
         res.logger.info(f"[CRW][analyze_data][analyze_batch_cached] Time to process batch {batch_id}: {time.time() - start_time:.2f} sec")
 
