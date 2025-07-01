@@ -41,7 +41,7 @@ async def run_batch(request: Request):
     batch_df = df.iloc[start_row:end_row]
 
     # Classificazione alert del batch
-    batch_result_list = await analyze_batch(batch_df, batch_id, batch_size)
+    batch_result_list = await analyze_batch(batch_df, batch_id, batch_size) # operazione sincrona (attendo che tutti i task asyncio terminino)
 
     # Salvataggio risultati su GCS
     batch_result_path = posixpath.join(res.gcs_batch_result_dir, f"result_{batch_id}.jsonl")
@@ -50,5 +50,7 @@ async def run_batch(request: Request):
         "\n".join(json.dumps(obj) for obj in batch_result_list),
         content_type="application/json"
     )
+
+    res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_result_path}'")
 
     return {"status": "completed", "batch_id": batch_id, "batch_path": batch_result_path}

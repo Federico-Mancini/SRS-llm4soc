@@ -143,29 +143,42 @@ async def chat(request: Request):
     return {"explanation": result["explanation"]}
 
 
-# Caricamento dataset (.jsonl o .csv) su GCS
+# Caricamento dataset (.jsonl o .csv) e relativi metadati su GCS
 @app.post("/upload-dataset")    # NOTA! nome endpoint cambiato dall'ultima volta.
 async def upload_alerts(file: UploadFile = File(...)):
-    # (se un file con lo stesso nome è già presente su GCS, viene sovrascritto)
+    # NB: se un file con lo stesso nome è già presente su GCS, viene sovrascritto
+    dataset_filename = file.filename
 
     # Controllo estensione file ricevuto
-    if not file.filename.endswith((".jsonl", ".csv")):
-        msg = f"[VMS][app][upload_alerts] -> Invalid file format: '{file.filename}' is not '.jsonl' or '.csv'"
+    if not dataset_filename.endswith((".jsonl", ".csv")):
+        msg = f"[VMS][app][upload_alerts] -> Invalid file format: '{dataset_filename}' is not '.jsonl' or '.csv'"
         res.logger.warning(msg)
         raise HTTPException(status_code=400, detail=msg)
     
     try:
-        blob_path = posixpath.join(res.gcs_dataset_dir, file.filename)
-        blob = res.bucket.blob(blob_path)
+        # Upload dataset
+        data = await file.read()
+        dataset_path = posixpath.join(res.gcs_dataset_dir, dataset_filename)
+        res.bucket.blob(dataset_path).upload_from_string(data, content_type=file.content_type)
 
-        file_data = await file.read()
-        blob.upload_from_string(file_data, content_type=file.content_type)
+        res.logger.info(f"[VMS][app][upload_alerts] -> Dataset file '{dataset_filename}' uploaded to '{dataset_path}'")
 
-        res.logger.info(f"[VMS][app][upload_alerts] -> File '{file.filename}' uploaded to '{blob_path}'")
-        return {"filename": file.filename, "message": "File caricato con successo"}
+        # Upload metadata dataset
+        metadata = gcs.get_dataset_metadata(dataset_filename)
+        metadata_filename = os.path.splitext(dataset_filename)[0] + "_metadata.json"
+        metadata_path = posixpath.join(res.gcs_metadata_dir, metadata_filename)
+        res.bucket.blob(metadata_path).upload_from_string(json.dumps(metadata, indent=2), content_type="application/json")
 
+        res.logger.info(f"[VMS][app][upload_alerts] -> Metadata file '{metadata_filename}' uploaded to '{metadata_path}'")
+
+        return {
+            "dataset": dataset_path,
+            "metadata": metadata_path,
+            "message": "File e metadati caricati con successo"
+        }
+    
     except Exception as e:
-        msg = f"[VMS][app][upload_alerts] -> Failed to upload '{file.filename}' ({type(e).__name__}): {str(e)}"
+        msg = f"[VMS][app][upload_alerts] -> Failed to upload '{dataset_filename}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
