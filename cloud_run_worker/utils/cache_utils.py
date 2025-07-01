@@ -35,10 +35,6 @@ def upload_cache(h: str, data: dict):
 
 
 # Leggi cache
-def download_cache(h: str) -> dict | None:    
+def download_cache(h: str) -> dict:    
     blob = res.bucket.blob(f"{res.gcs_cache_dir}/{h}.json")
-    
-    if blob.exists():
-        return json.loads(blob.download_as_text())
-    
-    return None
+    return json.loads(blob.download_as_text())

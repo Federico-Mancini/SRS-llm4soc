@@ -18,7 +18,7 @@ def merge_handler(event, context):
         n_blobs = len(blobs)
 
         if n_blobs == 0:
-            res.logger.warning(f"[CRF][main][merge_handler] -> No files found under prefix '{prefix}'")
+            res.logger.debug(f"[CRF][main][merge_handler] -> No files found under prefix '{prefix}'")
             return
 
         # Estrazione metadati
@@ -36,13 +36,8 @@ def merge_handler(event, context):
             res.logger.debug(f"[CRF][main][merge_handler] -> Found only {n_blobs}/{n_batches} files")
             return
         
-    except Exception as e:
-        res.logger.error(f"[CRF][main][merge_handler] -> Error in section 1 ({type(e).__name__}): {str(e)}")
-        raise
+        res.logger.info(f"[CRF][main][merge_handler] -> Found {n_blobs}/{n_batches} files. Now merging")
 
-    res.logger.info(f"[CRF][main][merge_handler] -> Found {n_blobs}/{n_batches} files. Now merging")
-
-    try:
         # Unione dei file result temporanei
         merged = []
         for blob in blobs:
@@ -73,5 +68,5 @@ def merge_handler(event, context):
         res.logger.info(f"[CRF][main][merge_handler] -> {count} batch result files deleted")
 
     except Exception as e:
-        res.logger.error(f"[CRF][main][merge_handler] -> Error in section 2 ({type(e).__name__}): {str(e)}")
+        res.logger.error(f"[CRF][main][merge_handler] -> Error ({type(e).__name__}): {str(e)}")
         raise

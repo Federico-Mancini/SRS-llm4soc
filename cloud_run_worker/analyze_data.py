@@ -134,7 +134,7 @@ def analyze_batch_sync_with_cache(batch_df: pd.DataFrame, batch_id: int) -> list
             h = alert_hash(alert)
 
             if h in existing_cache_hashes:
-                result = json.loads(res.bucket.blob(f"{res.gcs_cache_dir}/{h}.json").download_as_text())
+                result = download_cache(h)
             else:
                 result = analyze_alert_sync(i, alert)
 
@@ -215,7 +215,56 @@ async def analyze_batch_async(batch_df: pd.DataFrame, batch_id: int) -> list[dic
 
         # Creazione task asincroni, uno per alert
         alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]  # trasformazione di ogni record del dataframe in un oggetto json
-        tasks = [process_alert(i, alert, n_alerts) for i, alert in enumerate(alerts, start=1)]
+        tasks = [process_alert(i, alert) for i, alert in enumerate(alerts, start=1)]
+
+        res.logger.info(f"[CRW][analyze_data][analyze_batch_async] Time to process batch {batch_id}: {time.time() - start_time:.2f} sec")
+
+        return await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
+
+    except Exception as e:
+        res.logger.error(f"[CRW][analyze_data][analyze_batch_async] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
+        raise
+
+async def analyze_batch_async_with_cache(batch_df: pd.DataFrame, batch_id: int) -> list[dict]:
+    res.logger.info(f"[CRW][analyze_data][analyze_batch_async] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
+    start_time = time.time()
+
+    try:
+        # Estrazione lista nomi file cache (le graffe trasformano la lista in un set)
+        existing_cache_hashes = {
+            blob.name.split("/")[-1].replace(".json", "")  # es: "cache/H123.json" -> "H123"
+            for blob in res.bucket.list_blobs(prefix=res.gcs_cache_dir + "/")
+        }
+
+        # Pulizia cache
+        if len(existing_cache_hashes) > 1000:   # TODO: decidere quale soglia usare
+            cleanup_cache()
+        
+        semaphore = asyncio.Semaphore(res.max_concurrent_requests)
+
+        ### START - Funzione da parallelizzare (classificazione alert, gestione cache inclusa)
+        async def process_alert(i, alert) -> dict:
+            h = alert_hash(alert)
+
+            if h in existing_cache_hashes:
+                result = download_cache(h)
+            else:
+                result = await analyze_alert_async(i, alert, semaphore)
+
+                # Salvataggio cache
+                upload_cache(h, {
+                    "last_modified": time.time(),
+                    "class": result.get("class", "error"),
+                    "explanation": result.get("explanation", "error")
+                })
+
+            result["id"] = i
+            return result
+        ### END
+
+        # Creazione task asincroni, uno per alert
+        alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]  # trasformazione di ogni record del dataframe in un oggetto json
+        tasks = [process_alert(i, alert) for i, alert in enumerate(alerts, start=1)]
 
         res.logger.info(f"[CRW][analyze_data][analyze_batch_async] Time to process batch {batch_id}: {time.time() - start_time:.2f} sec")
 
