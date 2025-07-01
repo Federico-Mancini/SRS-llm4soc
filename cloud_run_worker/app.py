@@ -42,7 +42,7 @@ async def run_batch(request: Request):
 
     # Classificazione alert del batch
     #batch_result_list = analyze_batch_sync(batch_df, batch_id)
-    batch_result_list = analyze_batch_async_with_cache(batch_df, batch_id)
+    batch_result_list = await analyze_batch_async_with_cache(batch_df, batch_id)
     #batch_result_list = await analyze_batch_async(batch_df, batch_id)   # operazione sincrona (attendo che tutti i task asyncio terminino)
 
     # Salvataggio risultati su GCS
