@@ -29,10 +29,8 @@ def cleanup_cache():
 
 
 # Salva cache (un file di cache per ogni alert)
-def upload_cache(data: dict):
-    h = alert_hash(data)    # calcolo dell'impronta dell'alert
+def upload_cache(h: str, data: dict):
     blob = res.bucket.blob(f"{res.gcs_cache_dir}/{h}.json")
-
     blob.upload_from_string(json.dumps(data))
 
 

@@ -81,16 +81,6 @@ def analyze_batch_sync(batch_df: pd.DataFrame, batch_id: int) -> list[dict]:
     res.logger.info(f"[CRW][analyze_data][analyze_batch_sync] -> Processing batch {batch_id} containing {n_alerts} alerts")
 
     try:
-        # Estrazione lista nomi file cache
-        existing_cache_hashes = {
-            blob.name.split("/")[-1].replace(".json", "")  # o solo basename se su disco
-            for blob in res.bucket.list_blobs(prefix="cache_dir/")
-        }
-
-        # Pulizia cache
-        if len(existing_cache_hashes) > 1000:
-            cleanup_cache()
-
         ### START - Funzione da parallelizzare (classificazione alert, gestione cache inclusa)
         def process_alert(i, alert, num_alerts) -> dict:
             #cached = download_cache(alert_hash(alert))  # lettura cache
@@ -124,6 +114,52 @@ def analyze_batch_sync(batch_df: pd.DataFrame, batch_id: int) -> list[dict]:
         res.logger.error(f"[CRW][analyze_data][analyze_batch_sync] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
         raise
 
+def analyze_batch_sync_with_cache(batch_df: pd.DataFrame, batch_id: int) -> list[dict]:
+    res.logger.info(f"[CRW][analyze_data][analyze_batch_sync] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
+    start_time = time.time()
+
+    try:
+        # Estrazione lista nomi file cache (le graffe trasformano la lista in un set)
+        existing_cache_hashes = {
+            blob.name.split("/")[-1].replace(".json", "")  # es: "cache/H123.json" -> "H123"
+            for blob in res.bucket.list_blobs(prefix=res.gcs_cache_dir + "/")
+        }
+
+        # Pulizia cache
+        if len(existing_cache_hashes) > 1000:   # TODO: decidere quale soglia usare
+            cleanup_cache()
+
+        ### START - Funzione da parallelizzare (classificazione alert, gestione cache inclusa)
+        def process_alert(i, alert) -> dict:
+            h = alert_hash(alert)
+
+            if h in existing_cache_hashes:
+                result = json.loads(res.bucket.blob(f"{res.gcs_cache_dir}/{h}.json").download_as_text())
+            else:
+                result = analyze_alert_sync(i, alert)
+
+                # Salvataggio cache
+                upload_cache(h, {
+                    "last_modified": time.time(),
+                    "class": result.get("class", "error"),
+                    "explanation": result.get("explanation", "error")
+                })
+
+            result["id"] = i
+            return result
+        ### END
+
+        alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]
+        results = [process_alert(i, alert) for i, alert in enumerate(alerts, start=1)]
+
+        res.logger.info(f"[CRW][analyze_data][analyze_batch_sync] Time to process batch {batch_id}: {time.time() - start_time:.2f} sec")
+
+        return results
+
+    except Exception as e:
+        res.logger.error(f"[CRW][analyze_data][analyze_batch_sync] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
+        raise
+
 
 async def analyze_alert_async(i, alert, semaphore) -> dict:
     prompt = build_prompt(alert)
@@ -147,10 +183,8 @@ async def analyze_alert_async(i, alert, semaphore) -> dict:
             return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
 
 async def analyze_batch_async(batch_df: pd.DataFrame, batch_id: int) -> list[dict]:
+    res.logger.info(f"[CRW][analyze_data][analyze_batch_async] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
     start_time = time.time()
-    n_alerts = batch_df.shape[0]
-
-    res.logger.info(f"[CRW][analyze_data][analyze_batch_async] -> Processing batch {batch_id} containing {n_alerts} alerts")
 
     try:
         #cleanup_cache() # TODO: vedere se c'è un punto migliore in cui eseguire la pulizia della cache
