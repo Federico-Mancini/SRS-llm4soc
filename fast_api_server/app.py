@@ -79,11 +79,11 @@ async def monitor_batch_results():
                     metadata = gcs.get_metadata(dataset_name)
         
         batches = metadata.get("num_batches") if metadata else -1
-        
+        completion_rate = f"{count}/{batches} batches analyzed" if batches > 0 else "n/a"
+
         return {
             "status": "partial" if count > 0 else "pending",
-            "batches_completed": count,
-            "batches_to_be_done": batches - count if batches > 0 else "n/a",
+            "completion_rate": completion_rate,
             "dataset_name": dataset_name or "n/a"
         }
 

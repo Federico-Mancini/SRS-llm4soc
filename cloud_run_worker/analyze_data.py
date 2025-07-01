@@ -123,9 +123,10 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int) -
             for i, alert in enumerate(alerts, start=1)
         ]
 
+        results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
+        
         res.logger.info(f"[CRW][analyze_data][analyze_batch] Time to process batch {batch_id}: {time.time() - start_time:.2f} sec")
-
-        return await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
+        return results
 
     except Exception as e:
         res.logger.error(f"[CRW][analyze_data][analyze_batch] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
@@ -172,10 +173,11 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
         # Creazione task asincroni, uno per alert
         alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]  # trasformazione di ogni record del dataframe in un oggetto json
         tasks = [process_alert(start_row + i, alert) for i, alert in enumerate(alerts, start=1)]
-
+    
+        results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
+        
         res.logger.info(f"[CRW][analyze_data][analyze_batch_cached] Time to process batch {batch_id}: {time.time() - start_time:.2f} sec")
-
-        return await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
+        return results
 
     except Exception as e:
         res.logger.error(f"[CRW][analyze_data][analyze_batch_cached] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
