@@ -54,7 +54,65 @@ def build_alert_entry(i, t, c, e) -> dict:
     }
 
 
-# Funzione interna (privata), usata da analyze_batch_async
+def analyze_alert_sync(i, alert) -> dict:
+    prompt = build_prompt(alert)
+
+    try:
+        response = res.model.generate_content(prompt, generation_config=res.gen_conf)
+        text = response.text.strip()
+
+        if "{" in text and "}" in text:
+            text = text[text.find("{") : text.rfind("}") + 1]  # pulizia testo Gemini
+
+        try:
+            parsed = json.loads(text)
+            return build_alert_entry(i, alert.get("time", "n/a"), parsed.get("class", "error"), parsed.get("explanation", "Nessuna spiegazione"))
+
+        except json.JSONDecodeError:
+            return build_alert_entry(i, alert.get("time", "n/a"), "error", f"Output non valido: {text}")
+
+    except Exception as e:
+        return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
+
+def analyze_batch_sync(batch_df: pd.DataFrame, batch_id: int, batch_size: int) -> list[dict]:
+    res.logger.info(f"[CRW][analyze_data][analyze_batch_sync] -> Processing batch {batch_id} containing {batch_size} alerts")
+    start_time = time.time()
+
+    try:
+        cleanup_cache()  # TODO: valutare punto migliore per eseguire la pulizia della cache
+
+        ### START - Funzione da parallelizzare (classificazione alert, gestione cache inclusa)
+        def process_alert(i, alert, num_alerts) -> dict:
+            cached = download_cache(alert_hash(alert))  # lettura cache
+
+            if cached:
+                result = cached.copy()
+            else:
+                result = analyze_alert_sync(i, alert)  # versione sincrona
+
+                # Salvataggio cache
+                upload_cache({
+                    "last_modified": time.time(),
+                    "class": result.get("class", "error"),
+                    "explanation": result.get("explanation", "error")
+                })
+
+            result["id"] = i
+            return result
+        ### END
+
+        alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]
+        results = [process_alert(i, alert, len(alerts)) for i, alert in enumerate(alerts, start=1)]
+
+        res.logger.info(f"[CRW][analyze_data][analyze_batch_sync] Time to process batch {batch_id}: {time.time() - start_time} sec")
+
+        return results
+
+    except Exception as e:
+        res.logger.error(f"[CRW][analyze_data][analyze_batch_sync] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
+        raise
+
+
 async def analyze_alert_async(i, alert, semaphore) -> dict:
     prompt = build_prompt(alert)
 
@@ -76,8 +134,8 @@ async def analyze_alert_async(i, alert, semaphore) -> dict:
         except Exception as e:
             return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
 
-async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, batch_size: int) -> list[dict]:
-    res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Processing batch {batch_id} containing {batch_size} alerts")
+async def analyze_batch_async(batch_df: pd.DataFrame, batch_id: int, batch_size: int) -> list[dict]:
+    res.logger.info(f"[CRW][analyze_data][analyze_batch_async] -> Processing batch {batch_id} containing {batch_size} alerts")
 
     try:
         cleanup_cache() # TODO: vedere se c'è un punto migliore in cui eseguire la pulizia della cache
@@ -92,7 +150,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, batch_size: int) 
                 result = cached.copy()
             else:
                 result = await analyze_alert_async(i, alert, semaphore)
-                res.logger.info(f"[CRW][analyze_data][analyze_batch] Alert {i}/{num_alerts} classified")
+                res.logger.info(f"[CRW][analyze_data][analyze_batch_async] Alert {i}/{num_alerts} classified")
 
                 # Salvataggio cache (dati rilevanti di alert in file remoto dedicato)
                 upload_cache({
@@ -112,5 +170,5 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, batch_size: int) 
         return await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
 
     except Exception as e:
-        res.logger.error(f"[CRW][analyze_data][analyze_batch] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
+        res.logger.error(f"[CRW][analyze_data][analyze_batch_async] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
         raise

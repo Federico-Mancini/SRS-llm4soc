@@ -5,7 +5,7 @@ import pandas as pd
 
 from fastapi import FastAPI, HTTPException, Request
 from utils.resource_manager import resource_manager as res
-from analyze_data import analyze_batch
+from analyze_data import analyze_batch_sync, analyze_batch_async
 
 
 app = FastAPI()
@@ -41,7 +41,8 @@ async def run_batch(request: Request):
     batch_df = df.iloc[start_row:end_row]
 
     # Classificazione alert del batch
-    batch_result_list = await analyze_batch(batch_df, batch_id, batch_size) # operazione sincrona (attendo che tutti i task asyncio terminino)
+    batch_result_list = analyze_batch_sync(batch_df, batch_id, batch_size)
+    #batch_result_list = await analyze_batch_async(batch_df, batch_id, batch_size) # operazione sincrona (attendo che tutti i task asyncio terminino)
 
     # Salvataggio risultati su GCS
     batch_result_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
