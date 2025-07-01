@@ -188,7 +188,7 @@ async def upload_alerts(file: UploadFile = File(...)):
 async def analyze_dataset(dataset_filename: str = Query(...)):
     try:
         # Pulizia e preparazione
-        gcs.empty_dir(res.gcs_batch_result_dir) # svuotamento directory destinata ai risultati di analisi batch (fatto anche dalla CRF)
+        gcs.empty_dir(res.gcs_batch_result_dir) # svuotamento directory dei batch result file
 
         # Estrazione metadati da dataset
         dataset_name = os.path.splitext(dataset_filename)[0]

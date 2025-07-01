@@ -8,64 +8,68 @@ from resource_manager import resource_manager as res
 
 # Merge single result files in one final 'result.json' (eseguita come Cloud Function al trigger di GCS, cioè ogni volta che un file 'result' viene creato)
 def merge_handler(event, context):
+    prefix = res.gcs_batch_result_dir + "/"     # prefisso file "interessanti" (i trigger osservano l'intero bucket, non esiste un filtro più restrittivo)
+
     try:
-        bucket_name = event['bucket']   # estrazione nome bucket da chi ha generato l'evento trigger
-        bucket = storage.Client().bucket(bucket_name)
+        # Estrazione sorgenti evento
+        bucket_name = event['bucket']
+        object_name = event["name"]
+
+        if not object_name.startswith(prefix):
+            return
         
         # Estrazione dei batch result
-        prefix = res.gcs_batch_result_dir + "/"
+        bucket = storage.Client().bucket(bucket_name)
         blobs = list(bucket.list_blobs(prefix=prefix))
-        n_blobs = len(blobs)
-
-        if n_blobs == 0:
-            res.logger.debug(f"[CRF][main][merge_handler] -> No files found under prefix '{prefix}'")
+    
+        if not blobs:
             return
 
         # Estrazione metadati
-        dataset_name = os.path.basename(blobs[0].name).split("_result_")[0]     # nome dataset (presente in ognuno dei nomi dei file result)
-        metadata_path = posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json")
-        metadata_text = bucket.blob(metadata_path).download_as_text()
-        metadata = json.loads(metadata_text)
-        n_batches = metadata.get("num_batches", -1)
+        try:
+            dataset_name = os.path.basename(blobs[0].name).split("_result_")[0]     # es: "ABC_result_0.jsonl" -> "ABC"
+            metadata_blob = bucket.blob(posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json"))
+            metadata = json.loads(metadata_blob.download_as_text())
+            
+        except IndexError:
+            return  # nessun log in quanto è un errore senza effetti negativi, legato all'esecuzione parallela dell CRF
 
-        if n_batches < 0:
+        except Exception as e:
+            res.logger.error(f"[CRF][main][merge_handler] -> Failed to retrieve metadata ({type(e).__name__}): {str(e)}")
+            raise
+
+        expected_batches = metadata.get("num_batches", -1)
+        if expected_batches < 0:
             res.logger.warning("[CRF][main][merge_handler] -> 'n_batches' is undefined in the configuration file on GCS")
             return
-
-        if n_blobs < n_batches:
-            res.logger.debug(f"[CRF][main][merge_handler] -> Found only {n_blobs}/{n_batches} files")
+        
+        n_blobs = len(blobs)
+        if n_blobs < expected_batches:
+            res.logger.info(f"[CRF][main][merge_handler] -> Found only {n_blobs}/{expected_batches} files")
             return
         
-        res.logger.info(f"[CRF][main][merge_handler] -> Found {n_blobs}/{n_batches} files. Now merging")
+        res.logger.info(f"[CRF][main][merge_handler] -> Merging {n_blobs} batch result files")
 
         # Unione dei file result temporanei
-        merged = []
+        merged_alerts = []
         for blob in blobs:
             try:
                 lines = blob.download_as_text().strip().splitlines()
-                merged.extend(json.loads(line) for line in lines)
+                merged_alerts.extend(json.loads(line) for line in lines)
                 
             except Exception as e:
-                res.logger.warning(f"[CRF][main][merge_handler] -> Failed to read file '{blob.name}' ({type(e)}.__name__): {str(e)}")
+                res.logger.error(f"[CRF][main][merge_handler] -> Failed to parse '{blob.name}' ({type(e)}.__name__): {str(e)}")
 
         # Upload file unificato su GCS
         gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
         
         merged_blob = bucket.blob(gcs_result_path)
         merged_blob.upload_from_string(
-            json.dumps(merged, indent=2),
+            json.dumps(merged_alerts, indent=2),
             content_type="application/json"
         )
 
-        res.logger.info(f"[CRF][main][merge_handler] -> {len(merged)} alerts saved in '{gcs_result_path}'")
-
-        # Rimozione file temporanei
-        count = 0
-        for blob in blobs:
-            blob.delete()
-            count += 1
-
-        res.logger.info(f"[CRF][main][merge_handler] -> {count} batch result files deleted")
+        res.logger.info(f"[CRF][main][merge_handler] -> {len(merged_alerts)} alerts saved in '{gcs_result_path}'")
 
     except Exception as e:
         res.logger.error(f"[CRF][main][merge_handler] -> Error ({type(e).__name__}): {str(e)}")

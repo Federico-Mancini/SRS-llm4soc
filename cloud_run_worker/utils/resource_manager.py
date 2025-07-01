@@ -6,6 +6,7 @@ from utils.logger_utils import logger
 
 
 ASSET_BUCKET_NAME = "main-asset-storage"
+TMP_ASSET_BUCKET_NAME = "tmp-asset-storage"
 CONFIG_FILENAME = "config.json"
 
 
@@ -16,6 +17,7 @@ class ResourceManager:
         self._model = None
         self._gen_conf = None
         self._bucket = None
+        self._tmp_bucket = None
         self._n_batches = 3
         self._max_concurrent_requests = 8
         self._max_cache_age = 60 * 60 * 24 * 7
@@ -35,8 +37,9 @@ class ResourceManager:
         self._model = vxc.get_model()
         self._gen_conf = vxc.get_generation_config()
         
-        # Connessione al bucket GCS
+        # Connessione ai bucket GCS
         self._bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
+        self._tmp_bucket = storage.Client().bucket(TMP_ASSET_BUCKET_NAME)
 
         # Download variabili d'ambiente condivise su GCS
         conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
@@ -70,6 +73,10 @@ class ResourceManager:
     @property
     def bucket(self):
         return self._bucket
+    
+    @property
+    def tmp_bucket(self):
+        return self._tmp_bucket
     
     @property   # D
     def n_batches(self):

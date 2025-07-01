@@ -5,7 +5,7 @@ import pandas as pd
 
 from fastapi import FastAPI, HTTPException, Request
 from utils.resource_manager import resource_manager as res
-from analyze_data import analyze_batch_sync, analyze_batch_sync_with_cache, analyze_batch_async, analyze_batch_async_with_cache
+from analyze_data import analyze_batch_sync, analyze_batch_sync_with_cache, analyze_batch, analyze_batch_cached
 
 
 app = FastAPI()
@@ -32,22 +32,19 @@ async def run_batch(request: Request):
 
     batch_id, start_row, end_row, dataset_name, dataset_path = (body[field] for field in required_fields)
 
-    # Connessione al bucket
-    blob = res.bucket.blob(dataset_path)
-    data = blob.download_as_text()
-
-    # Carica e suddividi dataset
+    # Download e suddivisione del dataset
+    data = res.bucket.blob(dataset_path).download_as_text()
     df = pd.read_json(io.StringIO(data), lines=True)
     batch_df = df.iloc[start_row:end_row]
 
     # Classificazione alert del batch
-    #batch_result_list = analyze_batch_sync(batch_df, batch_id)
-    batch_result_list = await analyze_batch_async_with_cache(batch_df, batch_id)
-    #batch_result_list = await analyze_batch_async(batch_df, batch_id)   # operazione sincrona (attendo che tutti i task asyncio terminino)
-
+    batch_result_list = await analyze_batch(batch_df, batch_id)
+    #batch_result_list = await analyze_batch_cached(batch_df, batch_id) # TODO: testare efficacia cache su dataset più grandi
+    
     # Salvataggio risultati su GCS
     batch_result_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
     result_blob = res.bucket.blob(batch_result_path)
+    #result_blob = res.tmp_bucket.blob(batch_result_path)    # NB: il salvataggio dei batch result è fatto su un bucket separato (per isolare l'origine del trigger della CRF)
     result_blob.upload_from_string(
         "\n".join(json.dumps(obj) for obj in batch_result_list),
         content_type="application/json"
