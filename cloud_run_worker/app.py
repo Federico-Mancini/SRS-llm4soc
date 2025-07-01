@@ -17,6 +17,12 @@ async def block_root():
     raise HTTPException(status_code=404, detail="Invalid endpoint")
 
 
+# Check di stato di server (VM) e worker (Cloud Run)
+@app.get("/check-status")
+async def check_status():
+    return {"status": "running"}
+
+
 # Ricezione richieste d'analisi di un solo alert (da '/chat' di server)
 @app.post("/run-alert")
 async def run_alert(req: Request):

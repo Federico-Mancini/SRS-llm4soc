@@ -25,12 +25,14 @@ app.add_middleware(
 async def startup_event():
     res.logger.info("[VMS][app][startup_event] -> Virtual Machine Server - Status: running")
 
+    # Controllo esistenza file di configurazione locale
     path = res.vms_config_path
     if not os.path.isfile(path):
         msg = f"[VMS][app][startup_event] -> Config file '{path}' not found. Aborting startup"
         res.logger.error(msg)
         raise RuntimeError(msg)
     
+    # Upload file su GCS
     blob = res.bucket.blob(res.config_filename)
     blob.upload_from_filename(path)
 
@@ -43,11 +45,11 @@ async def block_root():
     raise HTTPException(status_code=404, detail="Invalid endpoint")
 
 
-# Check di stato di API e runner
+# Check di stato di server (VM) e worker (Cloud Run)
 @app.get("/check-status")
 async def check_status():
     try:
-        data = await call_worker("GET", res.worker_url)
+        data = await call_worker("GET", res.worker_url+ "/check-status")
         msg = data.get("status", "unknown")
 
     except Exception as e:
@@ -61,18 +63,28 @@ async def check_status():
 @app.get("/monitor-batch-results")
 async def monitor_batch_results():
     try:
-        result_blobs = res.bucket.list_blobs(prefix=res.gcs_batch_result_dir + "/")
-        batches = res.n_batches
+        blobs = res.bucket.list_blobs(prefix=res.gcs_batch_result_dir + "/")        
         count = 0
+        dataset_name = None
+        metadata = None
+        
+        for blob in blobs:
+            filename = os.path.basename(blob.name)
 
-        for blob in result_blobs:
-            if blob.name.startswith("result_") and blob.name.endswith(".jsonl"):
+            if "_result_" in filename and filename.endswith(".jsonl"):
                 count += 1
-                
+            
+                if not dataset_name:
+                    dataset_name = os.path.basename(blob.name).split("_result_")[0]     # es: "ABC_result_0.jsonl" -> "ABC"
+                    metadata = gcs.get_metadata(dataset_name)
+        
+        batches = metadata.get("num_batches") if metadata else -1
+        
         return {
             "status": "partial" if count > 0 else "pending",
             "batches_completed": count,
-            "batches_to_be_done": batches-count if batches > 0 else "Warning! 'n_batches' is still in its default state (-1)"
+            "batches_to_be_done": batches - count if batches > 0 else "n/a",
+            "dataset_name": dataset_name or "n/a"
         }
 
     except Exception as e:
@@ -122,7 +134,7 @@ async def upload_alerts(file: UploadFile = File(...)):
         res.logger.info(f"[VMS][app][upload_alerts] -> Dataset file '{dataset_filename}' uploaded to '{dataset_path}'")
 
         # Upload metadata dataset
-        metadata = gcs.get_dataset_metadata(dataset_filename)
+        metadata = gcs.create_metadata(dataset_filename)
         metadata_filename = os.path.splitext(dataset_filename)[0] + "_metadata.json"
         metadata_path = posixpath.join(res.gcs_dataset_dir, metadata_filename)
         res.bucket.blob(metadata_path).upload_from_string(json.dumps(metadata, indent=2), content_type="application/json")
@@ -150,9 +162,7 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
 
         # Estrazione metadati da dataset
         dataset_name = os.path.splitext(dataset_filename)[0]
-        metadata_path = posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json")
-        metadata_text = res.bucket.blob(metadata_path).download_as_text()
-        metadata = json.loads(metadata_text)
+        metadata = gcs.get_metadata(dataset_name)
         
         # Creazione e analisi dei singoli batch tramite Cloud Task
         enqueue_tasks(metadata)

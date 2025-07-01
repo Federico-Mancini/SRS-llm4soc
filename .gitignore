@@ -1,3 +1,4 @@
 /alert_classification
 /batch_classification
+/cloud_run_runner
 /chat_vertexai.py

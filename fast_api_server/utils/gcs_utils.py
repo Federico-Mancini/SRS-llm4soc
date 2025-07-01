@@ -1,4 +1,4 @@
-import os, io, posixpath
+import os, io, json, posixpath
 import pandas as pd
 
 from google.cloud import storage
@@ -18,7 +18,7 @@ def empty_dir(gcs_dir: str):
 
 
 # Calcolo metadati di un dataset remoto
-def get_dataset_metadata(dataset_filename: str):
+def create_metadata(dataset_filename: str) -> dict:
     gcs_dataset_path = posixpath.join(res.gcs_dataset_dir, dataset_filename)
     dataset_name, file_format = os.path.splitext(dataset_filename)
 
@@ -57,3 +57,10 @@ def get_dataset_metadata(dataset_filename: str):
         "dataset_name": dataset_name,
         "dataset_path": gcs_dataset_path
     }
+
+
+# Estrazione metadati di dataset pre-caricato su GCS
+def get_metadata(dataset_name: str) -> dict:
+    metadata_path = posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json")
+    metadata_text = res.bucket.blob(metadata_path).download_as_text()
+    return json.loads(metadata_text)
