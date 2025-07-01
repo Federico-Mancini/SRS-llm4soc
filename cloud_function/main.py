@@ -19,7 +19,8 @@ def merge_handler(event, context):
         # Estrazione metadati
         dataset_name = os.path.basename(blobs[0].name).split("_result_")[0]     # nome dataset (presente in ognuno dei nomi dei file result)
         metadata_path = posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json")
-        metadata = bucket.blob(metadata_path).download_as_text()
+        metadata_text = bucket.blob(metadata_path).download_as_text()
+        metadata = json.loads(metadata_text)
         n_batches = metadata.get("n_batches", -1)
 
         if n_batches < 0:
