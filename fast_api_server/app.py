@@ -183,26 +183,6 @@ async def upload_alerts(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=msg)
 
 
-# TODO: da rimuovere
-# Analisi dataset remoto (già caricato su GCS)
-# @app.get("/analyze-alerts")
-# async def analyze_alerts(dataset_filename: str = Query(...)):
-#     try:        
-#         response = await call_runner(
-#             method="GET",
-#             url=f"{res.runner_url}/run-dataset?dataset_filename={dataset_filename}",
-#             timeout=180.0   # 3 min (tempo massimo di suddivisione in batch di dataset medio-piccoli)
-#         )
-
-#         res.logger.info("[VMS][app][analyze_alerts] -> Request sent to the runner")
-
-#     except Exception as e:
-#         res.logger.error(f"[VMS][app][analyze_alerts] -> Failed to send request ({type(e)}): {str(e)}")
-#         return {"message": f"Errore sconosciuto ({type(e)}): {str(e)}"}
-    
-#     return response
-
-
 # Analisi dataset remoto (già caricato su GCS tramite '/upload-alerts')
 @app.get("/analyze-dataset")
 async def analyze_dataset(dataset_filename: str = Query(...)):
