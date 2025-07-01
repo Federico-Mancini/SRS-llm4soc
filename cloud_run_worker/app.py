@@ -41,7 +41,7 @@ async def run_batch(request: Request):
     batch_df = df.iloc[start_row:end_row]
 
     # Classificazione alert del batch
-    batch_result_list = analyze_batch_sync(batch_df, batch_id, batch_size)
+    batch_result_list = analyze_batch_async(batch_df, batch_id, batch_size)
     #batch_result_list = await analyze_batch_async(batch_df, batch_id, batch_size) # operazione sincrona (attendo che tutti i task asyncio terminino)
 
     # Salvataggio risultati su GCS

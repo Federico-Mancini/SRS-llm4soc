@@ -75,8 +75,10 @@ def analyze_alert_sync(i, alert) -> dict:
         return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
 
 def analyze_batch_sync(batch_df: pd.DataFrame, batch_id: int, batch_size: int) -> list[dict]:
-    res.logger.info(f"[CRW][analyze_data][analyze_batch_sync] -> Processing batch {batch_id} containing {batch_size} alerts")
     start_time = time.time()
+    n_alerts = batch_df.shape[0]
+
+    res.logger.info(f"[CRW][analyze_data][analyze_batch_sync] -> Processing batch {batch_id} containing {n_alerts} alerts")
 
     try:
         #cleanup_cache()  # TODO: valutare punto migliore per eseguire la pulizia della cache
@@ -104,7 +106,7 @@ def analyze_batch_sync(batch_df: pd.DataFrame, batch_id: int, batch_size: int) -
         ### END
 
         alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]
-        results = [process_alert(i, alert, len(alerts)) for i, alert in enumerate(alerts, start=1)]
+        results = [process_alert(i, alert, n_alerts) for i, alert in enumerate(alerts, start=1)]
 
         res.logger.info(f"[CRW][analyze_data][analyze_batch_sync] Time to process batch {batch_id}: {time.time() - start_time:.2f} sec")
 
@@ -137,7 +139,10 @@ async def analyze_alert_async(i, alert, semaphore) -> dict:
             return build_alert_entry(i, alert.get("time", "n/a"), "error", str(e))
 
 async def analyze_batch_async(batch_df: pd.DataFrame, batch_id: int, batch_size: int) -> list[dict]:
-    res.logger.info(f"[CRW][analyze_data][analyze_batch_async] -> Processing batch {batch_id} containing {batch_size} alerts")
+    start_time = time.time()
+    n_alerts = batch_df.shape[0]
+
+    res.logger.info(f"[CRW][analyze_data][analyze_batch_async] -> Processing batch {batch_id} containing {n_alerts} alerts")
 
     try:
         cleanup_cache() # TODO: vedere se c'è un punto migliore in cui eseguire la pulizia della cache
@@ -146,20 +151,21 @@ async def analyze_batch_async(batch_df: pd.DataFrame, batch_id: int, batch_size:
 
         ### START - Funzione da parallelizzare (classificazione alert, gestione cache inclusa)
         async def process_alert(i, alert, num_alerts) -> dict:
-            cached = download_cache(alert_hash(alert))    # lettura cache
+            #cached = download_cache(alert_hash(alert))  # lettura cache
+            cached = False  # TODO: eliminare (usato per test)
 
             if cached:
                 result = cached.copy()
             else:
                 result = await analyze_alert_async(i, alert, semaphore)
-                res.logger.info(f"[CRW][analyze_data][analyze_batch_async] Alert {i}/{num_alerts} classified")
 
-                # Salvataggio cache (dati rilevanti di alert in file remoto dedicato)
-                upload_cache({
-                    "last_modified": time.time(),
-                    "class": result.get("class", "error"),
-                    "explanation": result.get("explanation", "error")
-                })
+                # TODO: decommentare (fatto per test)
+                # Salvataggio cache
+                # upload_cache({
+                #     "last_modified": time.time(),
+                #     "class": result.get("class", "error"),
+                #     "explanation": result.get("explanation", "error")
+                # })
 
             result["id"] = i
             return result
@@ -167,7 +173,9 @@ async def analyze_batch_async(batch_df: pd.DataFrame, batch_id: int, batch_size:
 
         # Creazione task asincroni, uno per alert
         alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]  # trasformazione di ogni record del dataframe in un oggetto json
-        tasks = [process_alert(i, alert, len(alerts)) for i, alert in enumerate(alerts, start=1)]
+        tasks = [process_alert(i, alert, n_alerts) for i, alert in enumerate(alerts, start=1)]
+
+        res.logger.info(f"[CRW][analyze_data][analyze_batch_async] Time to process batch {batch_id}: {time.time() - start_time:.2f} sec")
 
         return await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
 
