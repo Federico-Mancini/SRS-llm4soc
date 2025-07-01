@@ -10,13 +10,13 @@ def enqueue_tasks(metadata: json):
     parent = client.queue_path(res.project_id, res.location, res.analysis_batch_queue_name)
 
     # Controllo ed estrazione campi
-    required_fields = ["num_rows", "num_batches", "batch_size", "dataset_path"]
+    required_fields = ["num_rows", "num_batches", "batch_size", "dataset_name", "dataset_path"]
     missing = [field for field in required_fields if field not in metadata or metadata[field] is None]
     
     if missing:
         return {"error": f"Missing required fields: {', '.join(missing)}"}
 
-    num_rows, num_batches, batch_size, dataset_path = (metadata[field] for field in required_fields)
+    num_rows, num_batches, batch_size, dataset_name, dataset_path = (metadata[field] for field in required_fields)
 
     # Invio richieste, una per batch
     for i in range(num_batches):
@@ -25,6 +25,7 @@ def enqueue_tasks(metadata: json):
             "start_row": i * batch_size,
             "end_row": min((i + 1) * batch_size, num_rows),
             "batch_size": batch_size,
+            "dataset_name": dataset_name,
             "dataset_path": dataset_path
         }
 

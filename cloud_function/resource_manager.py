@@ -12,7 +12,7 @@ class ResourceManager:
     def __init__(self):
         self._initialized = False
         self._logger = logger
-        self._n_batches = -1    # valore usato per indicare estrazione dati non ancora avvenuta
+        self._gcs_dataset_dir = "datasets"
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
@@ -29,7 +29,7 @@ class ResourceManager:
         conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
 
         # Variabili d'ambiente condivise su GCS
-        self._n_batches = conf.get("n_batches", self._n_batches)
+        self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
 
@@ -40,10 +40,10 @@ class ResourceManager:
     @property
     def logger(self):
         return self._logger
-    
+
     @property
-    def n_batches(self):
-        return self._n_batches
+    def gcs_dataset_dir(self):
+        return self._gcs_dataset_dir
 
     @property
     def gcs_result_dir(self):

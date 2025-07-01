@@ -166,7 +166,7 @@ async def upload_alerts(file: UploadFile = File(...)):
         # Upload metadata dataset
         metadata = gcs.get_dataset_metadata(dataset_filename)
         metadata_filename = os.path.splitext(dataset_filename)[0] + "_metadata.json"
-        metadata_path = posixpath.join(res.gcs_metadata_dir, metadata_filename)
+        metadata_path = posixpath.join(res.gcs_dataset_dir, metadata_filename)
         res.bucket.blob(metadata_path).upload_from_string(json.dumps(metadata, indent=2), content_type="application/json")
 
         res.logger.info(f"[VMS][app][upload_alerts] -> Metadata file '{metadata_filename}' uploaded to '{metadata_path}'")
@@ -211,8 +211,12 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         gcs.empty_dir(res.gcs_batch_result_dir) # svuotamento directory destinata ai risultati di analisi batch (fatto anche dalla CRF)
 
         # Estrazione metadati da dataset
-        metadata = gcs.get_dataset_metadata(dataset_filename)
-        enqueue_tasks(metadata)     # creazione e analisi dei singoli batch
+        dataset_name = os.path.splitext(dataset_filename)[0]
+        metadata_path = posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json")
+        metadata = res.bucket.blob(metadata_path).download_as_text()
+        
+        # Creazione e analisi dei singoli batch tramite Cloud Task
+        enqueue_tasks(metadata)
 
         return {
             "status": "analysis started",

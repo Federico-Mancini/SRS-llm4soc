@@ -1,6 +1,6 @@
 # CRF: Cloud Run Function
 
-import json, posixpath
+import os, json, posixpath
 
 from google.cloud import storage
 from resource_manager import resource_manager as res
@@ -9,23 +9,28 @@ from resource_manager import resource_manager as res
 # Merge single result files in one final 'result.json' (eseguita come Cloud Function al trigger di GCS, cioè ogni volta che un file 'result' viene creato)
 def merge_handler(event, context):
     try:
-        # Connessione al bucket
         bucket_name = event['bucket']   # estrazione nome bucket da chi ha generato l'evento trigger
         bucket = storage.Client().bucket(bucket_name)
-        prefix = res.gcs_batch_result_dir + "/"
         
-        # Estrazione di tutti i file batch
+        # Estrazione dei batch result
+        prefix = res.gcs_batch_result_dir + "/"
         blobs = list(bucket.list_blobs(prefix=prefix))
 
-        if res.n_batches < 0:
-            res.logger.warning("[CRF][main][merge_handler] -> 'n_batches' is undefined (-1). Skipping merge until value is initialized")
+        # Estrazione metadati
+        dataset_name = os.path.basename(blobs[0].name).split("_result_")[0]     # nome dataset (presente in ognuno dei nomi dei file result)
+        metadata_path = posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json")
+        metadata = bucket.blob(metadata_path).download_as_text()
+        n_batches = metadata.get("n_batches", -1)
+
+        if n_batches < 0:
+            res.logger.warning("[CRF][main][merge_handler] -> 'n_batches' is undefined in the configuration file on GCS")
             return
 
-        if len(blobs) < res.n_batches:
-            res.logger.debug(f"[CRF][main][merge_handler] -> Found only {len(blobs)}/{res.n_batches} files. Waiting for others...")
+        if len(blobs) < n_batches:
+            res.logger.debug(f"[CRF][main][merge_handler] -> Found only {len(blobs)}/{n_batches} files. Waiting for others...")
             return
         
-        res.logger.info(f"[CRF][main][merge_handler] -> Found {len(blobs)}/{res.n_batches} files. Now merging")
+        res.logger.info(f"[CRF][main][merge_handler] -> Found {len(blobs)}/{n_batches} files. Now merging")
 
         # Unione dei file result temporanei
         merged = []

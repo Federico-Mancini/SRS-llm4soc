@@ -24,13 +24,13 @@ async def run_batch(request: Request):
     body = await request.json()
 
     # Controllo ed estrazione campi
-    required_fields = ["batch_id", "start_row", "end_row", "batch_size", "dataset_path"]
+    required_fields = ["batch_id", "start_row", "end_row", "batch_size", "dataset_name", "dataset_path"]
     missing = [field for field in required_fields if field not in body or body[field] is None]
     
     if missing:
         return {"error": f"Missing required fields: {', '.join(missing)}"}
 
-    batch_id, start_row, end_row, batch_size, dataset_path = (body[field] for field in required_fields)
+    batch_id, start_row, end_row, batch_size, dataset_name, dataset_path = (body[field] for field in required_fields)
 
     # Connessione al bucket
     blob = res.bucket.blob(dataset_path)
@@ -44,7 +44,7 @@ async def run_batch(request: Request):
     batch_result_list = await analyze_batch(batch_df, batch_id, batch_size) # operazione sincrona (attendo che tutti i task asyncio terminino)
 
     # Salvataggio risultati su GCS
-    batch_result_path = posixpath.join(res.gcs_batch_result_dir, f"result_{batch_id}.jsonl")
+    batch_result_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
     result_blob = res.bucket.blob(batch_result_path)
     result_blob.upload_from_string(
         "\n".join(json.dumps(obj) for obj in batch_result_list),
