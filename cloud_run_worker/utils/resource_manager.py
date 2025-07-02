@@ -47,11 +47,11 @@ class ResourceManager:
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
 
         # Warm-up modello Gemini (risolve il problema del Cold Start o del caricamento on-demand del modello AI)
-        try:
-            self._model.generate_content("ping", generation_config=self._gen_conf)
-            self._logger.info("[CRW][resource_manager][initialize] Warm-up request sent to Gemini")
-        except Exception as e:
-            self._logger.warning(f"[CRW][resource_manager][initialize] Warm-up failed ({type(e).__name__}): {str(e)}")
+        # try:
+        #     self._model.generate_content("ping", generation_config=self._gen_conf)
+        #     self._logger.info("[CRW][resource_manager][initialize] Warm-up request sent to Gemini")
+        # except Exception as e:
+        #     self._logger.warning(f"[CRW][resource_manager][initialize] Warm-up failed ({type(e).__name__}): {str(e)}")
 
         self._initialized = True
         self._logger.info("[CRF][resource_manager][initialize] Initialization completed")

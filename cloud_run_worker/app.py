@@ -57,17 +57,20 @@ async def run_batch(request: Request):
 
         batch_id, start_row, end_row, batch_size, dataset_name, dataset_path = (body[field] for field in required_fields)
 
+        print("[CRW] ok 1")
         res.logger.info("[CRW] ok 1")
 
         # Download e suddivisione del dataset
         batch_df = gcs.load_batch_from_jsonl(dataset_path, start_row, end_row, batch_size)
 
+        print("[CRW] ok 2")
         res.logger.info("[CRW] ok 2")
 
         # Classificazione alert del batch
         batch_results = await analyze_batch(batch_df, batch_id, start_row, dataset_name)
         #batch_result_list = await analyze_batch_cached(batch_df, batch_id, start_row, dataset_name) # TODO: testare efficacia cache su dataset più grandi
         
+        print("[CRW] ok 3")
         res.logger.info("[CRW] ok 3")
         
         # Salvataggio risultati su GCS
