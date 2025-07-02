@@ -1,15 +1,16 @@
 # VMS: Virtual Machine Server
 
 import os ,json, posixpath
-import pandas as pd
 import utils.gcs_utils as gcs
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from utils.resource_manager import resource_manager as res
-from utils.task_utils import enqueue_tasks
-from utils.auth_utils import call_worker
+from utils.cloud_utils import call_worker, enqueue_batch_analysis_tasks
+from utils.io_utils import read_local_json
+from utils.metadata_utils import create_metadata, get_metadata
+
 
 
 # --- API configuration ---------------------------------------------------------------------------
@@ -118,13 +119,13 @@ async def chat(request: Request):
 # Upload dataset (.jsonl o .csv) e relativi metadati su GCS
 # NB: se si cambia 'alerts_per_batch' sul 'config.json' locale alla VM, va fatta una richiesta ad '/upload-dataset' per aggiornare anche il corrispondente valore salvato come metadato del dataset su GCS
 @app.post("/upload-dataset")
-async def upload_alerts(file: UploadFile = File(...)):
+async def upload_dataset(file: UploadFile = File(...)):
     # NB: se un file con lo stesso nome è già presente su GCS, viene sovrascritto
     dataset_filename = file.filename
 
     # Controllo estensione file ricevuto
     if not dataset_filename.endswith((".jsonl", ".csv")):
-        msg = f"[VMS][app][upload_alerts] -> Invalid file format: '{dataset_filename}' is not '.jsonl' or '.csv'"
+        msg = f"[VMS][app][upload_dataset] -> Invalid file format: '{dataset_filename}' is not '.jsonl' or '.csv'"
         res.logger.warning(msg)
         raise HTTPException(status_code=400, detail=msg)
     
@@ -134,15 +135,19 @@ async def upload_alerts(file: UploadFile = File(...)):
         dataset_path = posixpath.join(res.gcs_dataset_dir, dataset_filename)
         res.bucket.blob(dataset_path).upload_from_string(data, content_type=file.content_type)
 
-        res.logger.info(f"[VMS][app][upload_alerts] -> Dataset file '{dataset_filename}' uploaded to '{dataset_path}'")
+        res.logger.info(f"[VMS][app][upload_dataset] -> Dataset file '{dataset_filename}' uploaded to '{dataset_path}'")
 
         # Upload metadata dataset
-        metadata = gcs.create_metadata(dataset_filename)
-        metadata_filename = os.path.splitext(dataset_filename)[0] + "_metadata.json"
-        metadata_path = posixpath.join(res.gcs_dataset_dir, metadata_filename)
-        res.bucket.blob(metadata_path).upload_from_string(json.dumps(metadata, indent=2), content_type="application/json")
+        metadata = create_metadata(dataset_filename)
+        metadata_path = gcs.get_blob_path(res.gcs_dataset_dir, dataset_filename, "metadata", "json")
+        
+        blob = res.bucket.blob(metadata_path)
+        blob.upload_from_string(
+            json.dumps(metadata, indent=2),
+            content_type="application/json"
+        )
 
-        res.logger.info(f"[VMS][app][upload_alerts] -> Metadata file '{metadata_filename}' uploaded to '{metadata_path}'")
+        res.logger.info(f"[VMS][app][upload_dataset] -> Metadata file uploaded to '{metadata_path}'")
 
         return {
             "status": "completed",
@@ -165,11 +170,10 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         gcs.empty_dir(res.gcs_batch_result_dir) # svuotamento directory dei batch result file
 
         # Estrazione metadati da dataset
-        dataset_name = os.path.splitext(dataset_filename)[0]
-        metadata = gcs.get_metadata(dataset_name)
+        metadata = get_metadata(dataset_filename)
         
         # Creazione e analisi dei singoli batch tramite Cloud Task
-        enqueue_tasks(metadata)
+        enqueue_batch_analysis_tasks(metadata)
 
         return {
             "status": "analysis started",
@@ -186,7 +190,7 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
 # Visualizzazione file con alert classificati
 @app.get("/result")
 def get_result(dataset_filename: str = Query(...)):
-    blob_path = gcs.get_blob_path(dataset_filename, "result")
+    blob_path = gcs.get_blob_path(res.gcs_result_dir, dataset_filename, "result", "json")
     local_path = res.vms_result_path
     
     msg = gcs.download_to_local(blob_path, local_path)
@@ -197,7 +201,7 @@ def get_result(dataset_filename: str = Query(...)):
     
     # Lettura dati
     try:
-        return gcs.read_local_json(local_path)
+        return read_local_json(local_path)
     except Exception as e:
         msg = f"[VMS][app][get_result] -> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
@@ -207,7 +211,7 @@ def get_result(dataset_filename: str = Query(...)):
 # Visualizzazione file con metriche
 @app.get("/metrics")
 def get_metrics(dataset_filename: str = Query(...)):
-    blob_path = gcs.get_blob_path(dataset_filename, "metrics")
+    blob_path = gcs.get_blob_path(res.gcs_metrics_dir, dataset_filename, "metrics", "json")
     local_path = res.vms_metrics_path
 
     msg = gcs.download_to_local(blob_path, local_path)
@@ -218,7 +222,7 @@ def get_metrics(dataset_filename: str = Query(...)):
         
     # Lettura dati
     try:
-        return gcs.read_local_json(local_path)
+        return read_local_json(local_path)
     except Exception as e:
         msg = f"[VMS][app][get_metrics] -> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)

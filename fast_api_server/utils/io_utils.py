@@ -1,0 +1,26 @@
+import os, json
+from utils.resource_manager import resource_manager as res
+
+
+# Download file remoto in locale
+def download_to_local(blob_path: str, local_path: str) -> str | None:
+    blob = res.bucket.blob(blob_path)
+
+    # Controllo esistenza file remoto
+    if not blob.exists():
+        return f"[VMS][gcs_utils][download_to_local] -> File '{blob_path}' not found"
+        
+    blob.download_to_filename(local_path)
+
+    # Controllo esistenza file locale
+    if not os.path.exists(local_path):
+        return f"[VMS][gcs_utils][download_to_local] -> Downloaded file not found locally in '{local_path}'"
+    
+
+# Lettura file JSON locale
+def read_local_json(local_path: str) -> list | dict:    # se nel file c'è un solo oggetto, sarà restituito un 'dict', altrimenti una 'list[dict]'
+    with open(local_path, "r") as f:
+        data = json.load(f)
+
+    res.logger.info(f"[VMS][gcs_utils][read_local_json] -> File '{local_path}' read")
+    return data

@@ -1,7 +1,7 @@
 import json, time, asyncio
 import pandas as pd
 import utils.gcs_utils as gcs
-import utils.performance_monitor as pm
+import utils.performance_utils as prf
 
 from utils.resource_manager import resource_manager as res
 from utils.cache_utils import alert_hash, cleanup_cache, download_cache, upload_cache
@@ -75,6 +75,7 @@ def process_model_response(text: str, alert: dict, alert_id: int = 0) -> dict:
             "explanation": f"Output non valido: {text}"
         }
 
+
 # Analisi alert per l'endpoint '/chat'
 def analyze_one_alert(alert: dict) -> dict:
     prompt = build_prompt(alert)
@@ -119,10 +120,11 @@ async def analyze_batch_alert(i: int, alert: dict, semaphore) -> dict:
                 "explanation": f"{type(e).__name__}: {str(e)}"
             }
 
+
 # Analisi asincrona di batch
 async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, dataset_name: str) -> list[dict]:
     res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
-    start = pm.init_monitoring()
+    start = prf.init_monitoring()
 
     concurrency = min(len(batch_df), res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
     semaphore = asyncio.Semaphore(concurrency)
@@ -140,9 +142,9 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
         results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
         
         # Metriche
-        metrics = pm.finalize_monitoring(start, batch_id, len(batch_df))
+        metrics = prf.finalize_monitoring(start, batch_id, len(batch_df))
         metrics_path = f"{res.gcs_batch_metrics_dir}/{dataset_name}_batch_{batch_id}.jsonl"
-        await gcs.upload_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
+        await gcs.upload_as_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
         
         res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, Time elapsed: {metrics['time_sec']}s, RAM usage: {metrics['ram_mb']}MB")
 
@@ -155,7 +157,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
 # Analisi asincrona di batch con gestione cache
 async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row: int, dataset_name: str) -> list[dict]:
     res.logger.info(f"[CRW][analyze_data][analyze_batch_cached] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
-    start = pm.init_monitoring()
+    start = prf.init_monitoring()
 
     concurrency = min(len(batch_df), res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
     semaphore = asyncio.Semaphore(concurrency)
@@ -192,10 +194,6 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
         ### END
 
         # Trasformazione dei record del dataframe in lista di oggetti json
-        # alerts = [
-        #     dict(zip(batch_df.columns, row))
-        #     for row in batch_df.itertuples(index=False, name=None)
-        # ]
         alerts = batch_df.to_dict(orient='records')
 
         # Parallelizzazione delle analisi sugli alert
@@ -205,9 +203,12 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
         ]
     
         results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
+        # Metriche
+        metrics = prf.finalize_monitoring(start, batch_id, len(batch_df))
+        metrics_path = f"{res.gcs_batch_metrics_dir}/{dataset_name}_batch_{batch_id}.jsonl"
+        await gcs.upload_as_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
         
-        metrics = pm.finalize_monitoring(start, batch_id, len(batch_df))
-        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, Time elapsed: {metrics['time_sec']}s, RAM usage: {metrics['ram_mb']}MB")
+        res.logger.info(f"[CRW][analyze_data][analyze_batch_cached] -> Batch {batch_id}, Time elapsed: {metrics['time_sec']}s, RAM usage: {metrics['ram_mb']}MB")
         
         return results
 

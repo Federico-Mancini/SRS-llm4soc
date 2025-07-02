@@ -2,7 +2,6 @@
 
 import os, posixpath
 import utils.gcs_utils as gcs
-import utils.merge_utils as mrg
 
 from google.cloud import storage
 from utils.resource_manager import resource_manager as res
@@ -55,12 +54,12 @@ def merge_handler(event, context):
 
         # Unificazione e upload file JSON (batch result file)
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch result files in '{gcs_result_path}'")
-        result_data = list(mrg.stream_jsonl_blobs(res_blobs))
+        result_data = list(gcs.stream_jsonl_blobs(res_blobs))
         gcs.upload_json(bucket, gcs_result_path, result_data)
 
         # Unificazione e upload file CSV (batch metrics file)
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch metrics files in '{gcs_metrics_path}'")
-        metrics_data = list(mrg.stream_jsonl_blobs(met_blobs))
+        metrics_data = list(gcs.stream_jsonl_blobs(met_blobs))
         gcs.upload_json(bucket, gcs_metrics_path, metrics_data)
 
     except Exception as e:

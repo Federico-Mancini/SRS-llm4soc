@@ -15,6 +15,7 @@ class ResourceManager:
         self._bucket = None
         self._alerts_per_batch = 100
         self._gcs_dataset_dir = "input_datasets"
+        self._gcs_metrics_dir = "metrics"
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
         self._config_filename = "config.json"
@@ -42,6 +43,7 @@ class ResourceManager:
         # Variabili d'ambiente condivise su GCS
         self._alerts_per_batch = conf.get("alerts_per_batch", self._alerts_per_batch)
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
+        self._gcs_metrics_dir = conf.get("gcs_metrics_dir", self._gcs_metrics_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
         self._config_filename = conf.get("config_filename", self._config_filename)
@@ -82,7 +84,11 @@ class ResourceManager:
     @property
     def gcs_dataset_dir(self):
         return self._gcs_dataset_dir
-    
+
+    @property
+    def gcs_metrics_dir(self):
+        return self._gcs_metrics_dir
+
     @property
     def gcs_result_dir(self):
         return self._gcs_result_dir
