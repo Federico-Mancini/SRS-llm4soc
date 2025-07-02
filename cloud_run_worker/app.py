@@ -45,28 +45,40 @@ async def run_alert(req: Request):
 # Operazioni: estrazione batch dal dataset remoto -> classificazione alert -> creazione file result temporaneo
 @app.post("/run-batch")
 async def run_batch(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
 
-    # Controllo ed estrazione campi
-    required_fields = ["batch_id", "start_row", "end_row", "batch_size", "dataset_name", "dataset_path"]
-    missing = [field for field in required_fields if field not in body or body[field] is None]
+        # Controllo ed estrazione campi
+        required_fields = ["batch_id", "start_row", "end_row", "batch_size", "dataset_name", "dataset_path"]
+        missing = [field for field in required_fields if field not in body or body[field] is None]
+        
+        if missing:
+            return {"error": f"Missing required fields: {', '.join(missing)}"}
+
+        batch_id, start_row, end_row, batch_size, dataset_name, dataset_path = (body[field] for field in required_fields)
+
+        res.logger.info("[CRW] ok 1")
+
+        # Download e suddivisione del dataset
+        batch_df = gcs.load_batch_from_jsonl(dataset_path, start_row, end_row, batch_size)
+
+        res.logger.info("[CRW] ok 2")
+
+        # Classificazione alert del batch
+        batch_results = await analyze_batch(batch_df, batch_id, start_row, dataset_name)
+        #batch_result_list = await analyze_batch_cached(batch_df, batch_id, start_row, dataset_name) # TODO: testare efficacia cache su dataset più grandi
+        
+        res.logger.info("[CRW] ok 3")
+        
+        # Salvataggio risultati su GCS
+        batch_results_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
+        await gcs.save_batch_results_async(res.bucket, batch_results_path, batch_results)
+
+        res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")
+
+        return {"status": "completed", "batch_id": batch_id, "batch_path": batch_results_path}
     
-    if missing:
-        return {"error": f"Missing required fields: {', '.join(missing)}"}
-
-    batch_id, start_row, end_row, batch_size, dataset_name, dataset_path = (body[field] for field in required_fields)
-
-    # Download e suddivisione del dataset
-    batch_df = gcs.load_batch_from_jsonl(dataset_path, start_row, end_row, batch_size)
-
-    # Classificazione alert del batch
-    batch_results = await analyze_batch(batch_df, batch_id, start_row, dataset_name)
-    #batch_result_list = await analyze_batch_cached(batch_df, batch_id, start_row, dataset_name) # TODO: testare efficacia cache su dataset più grandi
-    
-    # Salvataggio risultati su GCS
-    batch_results_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
-    await gcs.save_batch_results_async(res.bucket, batch_results_path, batch_results)
-
-    res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")
-
-    return {"status": "completed", "batch_id": batch_id, "batch_path": batch_results_path}
+    except Exception as e:
+        msg = f"[CRW][app][run_batch] -> Error ({type(e).__name__}): {str(e)}"
+        res.logger.error(msg)
+        return {"detail": msg}
