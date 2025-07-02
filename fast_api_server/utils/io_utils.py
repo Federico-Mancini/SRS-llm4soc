@@ -1,21 +1,6 @@
-import os, json
+import os, json, httpx
 from utils.resource_manager import resource_manager as res
 
-
-# Download file remoto in locale
-def download_to_local(blob_path: str, local_path: str) -> str | None:
-    blob = res.bucket.blob(blob_path)
-
-    # Controllo esistenza file remoto
-    if not blob.exists():
-        return f"[VMS][gcs_utils][download_to_local] -> File '{blob_path}' not found"
-        
-    blob.download_to_filename(local_path)
-
-    # Controllo esistenza file locale
-    if not os.path.exists(local_path):
-        return f"[VMS][gcs_utils][download_to_local] -> Downloaded file not found locally in '{local_path}'"
-    
 
 # Lettura file JSON locale
 def read_local_json(local_path: str) -> list | dict:    # se nel file c'è un solo oggetto, sarà restituito un 'dict', altrimenti una 'list[dict]'
@@ -24,3 +9,23 @@ def read_local_json(local_path: str) -> list | dict:    # se nel file c'è un so
 
     res.logger.info(f"[VMS][gcs_utils][read_local_json] -> File '{local_path}' read")
     return data
+
+
+# Download file remoto in locale
+def download_to_local(blob_path: str, local_path: str):
+    blob = res.bucket.blob(blob_path)
+
+    # Controllo esistenza file remoto
+    if not blob.exists():
+        msg = f"[VMS][gcs_utils][download_to_local] -> File '{blob_path}' not found"
+        res.logger.error(msg)
+        raise httpx.HTTPException(status_code=404, detail=msg)
+        
+    blob.download_to_filename(local_path)
+
+    # Controllo esistenza file locale
+    if not os.path.exists(local_path):
+        msg = f"[VMS][gcs_utils][download_to_local] -> Downloaded file not found locally in '{local_path}'"
+        res.logger.error(msg)
+        raise httpx.HTTPException(status_code=404, detail=msg)
+    

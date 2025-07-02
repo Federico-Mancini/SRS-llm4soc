@@ -1,6 +1,6 @@
 import os, io, json, posixpath
 import pandas as pd
-import gcs_utils as gcs
+import utils.gcs_utils as gcs
 
 from utils.resource_manager import resource_manager as res
 
@@ -49,6 +49,6 @@ def create_metadata(dataset_filename: str) -> dict:
 
 # Estrazione metadati di dataset pre-caricato su GCS
 def get_metadata(dataset_filename: str) -> dict:
-    path = gcs.get_blob_path(dataset_filename, "metadata", "json")
+    path = gcs.get_blob_path(res.gcs_dataset_dir, dataset_filename, "metadata", "json")
     metadata_text = res.bucket.blob(path).download_as_text()
     return json.loads(metadata_text)

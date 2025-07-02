@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from utils.resource_manager import resource_manager as res
 from utils.cloud_utils import call_worker, enqueue_batch_analysis_tasks
-from utils.io_utils import read_local_json
+from utils.io_utils import read_local_json, download_to_local
 from utils.metadata_utils import create_metadata, get_metadata
 
 
@@ -78,7 +78,7 @@ async def monitor_batch_results():
             
                 if not dataset_name:
                     dataset_name = os.path.basename(blob.name).split("_result_")[0]     # es: "ABC_result_0.jsonl" -> "ABC"
-                    metadata = gcs.get_metadata(dataset_name)
+                    metadata = get_metadata(dataset_name)
         
         batches = metadata.get("num_batches") if metadata else -1
         status = "pending" if count == 0 else "partial" if count < batches else "completed"
@@ -192,15 +192,10 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
 def get_result(dataset_filename: str = Query(...)):
     blob_path = gcs.get_blob_path(res.gcs_result_dir, dataset_filename, "result", "json")
     local_path = res.vms_result_path
-    
-    msg = gcs.download_to_local(blob_path, local_path)
 
-    if not msg:
-        res.logger.warning(msg)
-        raise HTTPException(status_code=404, detail=msg)
-    
     # Lettura dati
     try:
+        download_to_local(blob_path, local_path)
         return read_local_json(local_path)
     except Exception as e:
         msg = f"[VMS][app][get_result] -> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
@@ -214,14 +209,9 @@ def get_metrics(dataset_filename: str = Query(...)):
     blob_path = gcs.get_blob_path(res.gcs_metrics_dir, dataset_filename, "metrics", "json")
     local_path = res.vms_metrics_path
 
-    msg = gcs.download_to_local(blob_path, local_path)
-
-    if not msg:
-        res.logger.warning(msg)
-        raise HTTPException(status_code=404, detail=msg)
-        
     # Lettura dati
     try:
+        download_to_local(blob_path, local_path)
         return read_local_json(local_path)
     except Exception as e:
         msg = f"[VMS][app][get_metrics] -> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
