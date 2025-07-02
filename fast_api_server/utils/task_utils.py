@@ -24,6 +24,7 @@ def enqueue_tasks(metadata: json):
             "batch_id": i,
             "start_row": i * batch_size,
             "end_row": min((i + 1) * batch_size, num_rows),
+            "batch_size": batch_size,
             "dataset_name": dataset_name,
             "dataset_path": dataset_path
         }

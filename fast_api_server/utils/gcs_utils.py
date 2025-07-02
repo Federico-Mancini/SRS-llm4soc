@@ -1,7 +1,6 @@
 import os, io, json, posixpath
 import pandas as pd
 
-from google.cloud import storage
 from utils.resource_manager import resource_manager as res
 
 

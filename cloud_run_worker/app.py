@@ -2,6 +2,7 @@
 
 import io, json, asyncio, posixpath
 import pandas as pd
+import utils.gcs_utils as gcs
 
 from fastapi import FastAPI, HTTPException, Request
 from concurrent.futures import ThreadPoolExecutor
@@ -48,30 +49,25 @@ async def run_batch(request: Request):
     body = await request.json()
 
     # Controllo ed estrazione campi
-    required_fields = ["batch_id", "start_row", "end_row", "dataset_name", "dataset_path"]
+    required_fields = ["batch_id", "start_row", "end_row", "batch_size", "dataset_name", "dataset_path"]
     missing = [field for field in required_fields if field not in body or body[field] is None]
     
     if missing:
         return {"error": f"Missing required fields: {', '.join(missing)}"}
 
-    batch_id, start_row, end_row, dataset_name, dataset_path = (body[field] for field in required_fields)
+    batch_id, start_row, end_row, batch_size, dataset_name, dataset_path = (body[field] for field in required_fields)
 
     # Download e suddivisione del dataset
-    data = res.bucket.blob(dataset_path).download_as_text()
-    df = pd.read_json(io.StringIO(data), lines=True)
-    batch_df = df.iloc[start_row:end_row]
+    batch_df = gcs.load_batch_from_jsonl(dataset_path, start_row, end_row, batch_size)
 
     # Classificazione alert del batch
-    batch_result_list = await analyze_batch(batch_df, batch_id, start_row)
-    #batch_result_list = await analyze_batch_cached(batch_df, batch_id, start_row) # TODO: testare efficacia cache su dataset più grandi
+    batch_results = await analyze_batch(batch_df, batch_id, start_row, dataset_name)
+    #batch_result_list = await analyze_batch_cached(batch_df, batch_id, start_row, dataset_name) # TODO: testare efficacia cache su dataset più grandi
     
     # Salvataggio risultati su GCS
-    batch_result_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
-    res.bucket.blob(batch_result_path).upload_from_string(
-        "\n".join(json.dumps(obj) for obj in batch_result_list),
-        content_type="application/json"
-    )
+    batch_results_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
+    await gcs.save_batch_results_async(res.bucket, batch_results_path, batch_results)
 
-    res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_result_path}'")
+    res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")
 
-    return {"status": "completed", "batch_id": batch_id, "batch_path": batch_result_path}
+    return {"status": "completed", "batch_id": batch_id, "batch_path": batch_results_path}

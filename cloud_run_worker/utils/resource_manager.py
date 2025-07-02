@@ -19,6 +19,7 @@ class ResourceManager:
         self._max_concurrent_requests = 16
         self._max_cache_age = 60 * 60 * 24 * 7
         self._gcs_cache_dir = "cache"
+        self._gcs_metrics_dir = "metrics"
         self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
         self.initialize()
@@ -42,7 +43,15 @@ class ResourceManager:
         self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
         self._max_cache_age = conf.get("max_cache_age", self._max_cache_age)
         self._gcs_cache_dir = conf.get("gcs_cache_dir", self._gcs_cache_dir)
+        self._gcs_metrics_dir = conf.get("gcs_metrics_dir", self._gcs_metrics_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
+
+        # Warm-up modello Gemini (risolve il problema del Cold Start o del caricamento on-demand del modello AI)
+        try:
+            self._model.generate_content("ping", generation_config=self._gen_conf)
+            self._logger.info("[CRW][resource_manager][initialize] Warm-up request sent to Gemini")
+        except Exception as e:
+            self._logger.warning(f"[CRW][resource_manager][initialize] Warm-up failed ({type(e).__name__}): {str(e)}")
 
         self._initialized = True
         self._logger.info("[CRF][resource_manager][initialize] Initialization completed")
@@ -75,6 +84,10 @@ class ResourceManager:
     @property
     def gcs_cache_dir(self):
         return self._gcs_cache_dir
+    
+    @property
+    def gcs_metrics_dir(self):
+        return self._gcs_metrics_dir
     
     @property
     def gcs_batch_result_dir(self):

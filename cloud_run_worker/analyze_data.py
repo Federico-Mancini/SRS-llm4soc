@@ -1,5 +1,6 @@
 import json, time, asyncio
 import pandas as pd
+import utils.performance_monitor as pm
 
 from utils.resource_manager import resource_manager as res
 from utils.cache_utils import alert_hash, cleanup_cache, download_cache, upload_cache
@@ -62,7 +63,10 @@ def process_model_response(text: str, alert: dict, alert_id: int = 0) -> dict:
             "explanation": parsed.get("explanation", "Nessuna spiegazione")
         }
     
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        msg = text[:200].replace("\n", " ").replace("\"", "'")  # visualizzazione dei primi 200 caratteri, leggermente formattati per leggibilità
+        res.logger.warning(f"[CRW][analyze_data][process_model_response] Failed to parse JSON: {str(e)} | Response: {msg}")
+
         return {
             "id": alert_id,
             "timestamp": alert.get("time", "n/a"),
@@ -92,9 +96,20 @@ async def analyze_batch_alert(i, alert, semaphore) -> dict:
     
     async with semaphore:
         try:
-            response = await asyncio.to_thread(res.model.generate_content, prompt, generation_config=res.gen_conf)
+            response = await asyncio.wait_for(
+                asyncio.to_thread(res.model.generate_content, prompt, generation_config=res.gen_conf),
+                timeout=20  # tempo massimo concesso per una risposta
+            )
             return process_model_response(response.text, alert, i)
         
+        except asyncio.TimeoutError:
+            return {
+                "id": i,
+                "timestamp": alert.get("time", "n/a"),
+                "class": "error",
+                "explanation": "Timeout: il modello ha impiegato troppo tempo per rispondere"
+            }
+    
         except Exception as e:
             return {
                 "id": i,
@@ -104,18 +119,20 @@ async def analyze_batch_alert(i, alert, semaphore) -> dict:
             }
 
 # Analisi asincrona di batch
-async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int) -> list[dict]:
+async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, dataset_name: str) -> list[dict]:
     res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
-    start_time = time.time()
+    start = pm.init_monitoring()
 
-    semaphore = asyncio.Semaphore(res.max_concurrent_requests)
+    concurrency = min(len(batch_df), res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
+    semaphore = asyncio.Semaphore(concurrency)
 
     try:
-        # Trasformazione dei record del dataframe in oggetti json
-        alerts = [
-            dict(zip(batch_df.columns, row))
-            for row in batch_df.itertuples(index=False, name=None)
-        ]
+        # Trasformazione dei record del dataframe in lista di oggetti json
+        # alerts = [
+        #     dict(zip(batch_df.columns, row))
+        #     for row in batch_df.itertuples(index=False, name=None)
+        # ]
+        alerts = batch_df.to_dict(orient='records') 
 
         # Parallelizzazione delle analisi sugli alert
         tasks = [
@@ -125,7 +142,13 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int) -
 
         results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
         
-        res.logger.info(f"[CRW][analyze_data][analyze_batch] Time to process batch {batch_id}: {time.time() - start_time:.2f} sec")
+        # Metriche
+        metrics = [pm.finalize_monitoring(start, batch_id, len(batch_df))]
+        metrics_path = f"{res.gcs_metrics_dir}/{dataset_name}_batch_{batch_id}.csv"
+        pm.upload_metrics_to_gcs(metrics, metrics_path)
+        
+        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, Time elapsed: {metrics['time_sec']}s, RAM usage: {metrics['ram_mb']}MB")
+
         return results
 
     except Exception as e:
@@ -133,9 +156,12 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int) -
         raise
 
 # Analisi asincrona di batch con gestione cache
-async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row: int) -> list[dict]:
+async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row: int, dataset_name: str) -> list[dict]:
     res.logger.info(f"[CRW][analyze_data][analyze_batch_cached] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
-    start_time = time.time()
+    start = pm.init_monitoring()
+
+    concurrency = min(len(batch_df), res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
+    semaphore = asyncio.Semaphore(concurrency)
 
     try:
         # Estrazione lista nomi file cache (le graffe trasformano la lista in un set)
@@ -148,8 +174,6 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
         if len(existing_cache_hashes) > 1000:   # TODO: decidere quale soglia usare
             cleanup_cache()
         
-        semaphore = asyncio.Semaphore(res.max_concurrent_requests)
-
         ### START - Funzione da parallelizzare (classificazione alert, gestione cache inclusa)
         async def process_alert(i, alert) -> dict:
             h = alert_hash(alert)
@@ -170,13 +194,24 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
             return result
         ### END
 
-        # Creazione task asincroni, uno per alert
-        alerts = [dict(zip(batch_df.columns, row)) for row in batch_df.itertuples(index=False, name=None)]  # trasformazione di ogni record del dataframe in un oggetto json
-        tasks = [process_alert(start_row + i, alert) for i, alert in enumerate(alerts, start=1)]
+        # Trasformazione dei record del dataframe in lista di oggetti json
+        # alerts = [
+        #     dict(zip(batch_df.columns, row))
+        #     for row in batch_df.itertuples(index=False, name=None)
+        # ]
+        alerts = batch_df.to_dict(orient='records')
+
+        # Parallelizzazione delle analisi sugli alert
+        tasks = [
+            process_alert(start_row + i, alert)
+            for i, alert in enumerate(alerts, start=1)
+        ]
     
         results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
         
-        res.logger.info(f"[CRW][analyze_data][analyze_batch_cached] Time to process batch {batch_id}: {time.time() - start_time:.2f} sec")
+        metrics = pm.finalize_monitoring(start, batch_id, len(batch_df))
+        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, Time elapsed: {metrics['time_sec']}s, RAM usage: {metrics['ram_mb']}MB")
+        
         return results
 
     except Exception as e:

@@ -6,6 +6,7 @@
   "asset_bucket_name": "main-asset-storage",
   "gcs_dataset_dir": "datasets",
   "gcs_cache_dir": "cache",
+  "gcs_metrics_dir": "metrics",
   "gcs_result_dir": "results",
   "gcs_batch_result_dir": "batch_results",
 

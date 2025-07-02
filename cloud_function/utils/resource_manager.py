@@ -1,7 +1,7 @@
 import json
 
 from google.cloud import storage
-from logger_utils import logger
+from utils.logger_utils import logger
 
 
 ASSET_BUCKET_NAME = "main-asset-storage"
@@ -13,6 +13,7 @@ class ResourceManager:
         self._initialized = False
         self._logger = logger
         self._gcs_dataset_dir = "datasets"
+        self._gcs_metrics_dir = "metrics"
         self._gcs_result_dir = "results"
         self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
@@ -23,13 +24,14 @@ class ResourceManager:
             return
         
         # Connessione ai bucket GCS
-        self._bucket = storage.Client().bucket(ASSET_BUCKET_NAME)
+        self._bucket = storage.Client().bucket(ASSET_BUCKET_NAME)   # NB: non condividere questa variabile in quanto ricavata dall'evento trigger
 
         # Download variabili d'ambiente condivise su GCS
         conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
 
         # Variabili d'ambiente condivise su GCS
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
+        self._gcs_metrics_dir = conf.get("gcs_metrics_dir", self._gcs_metrics_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
 
@@ -44,6 +46,10 @@ class ResourceManager:
     @property
     def gcs_dataset_dir(self):
         return self._gcs_dataset_dir
+    
+    @property
+    def gcs_metrics_dir(self):
+        return self._gcs_metrics_dir
 
     @property
     def gcs_result_dir(self):

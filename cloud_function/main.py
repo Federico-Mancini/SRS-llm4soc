@@ -1,35 +1,40 @@
 # CRF: Cloud Run Function
 
-import os, json, posixpath
+import os, io, json, posixpath, csv
+import utils.gcs_utils as gcs
+import utils.merge_utils as mrg
 
 from google.cloud import storage
-from resource_manager import resource_manager as res
+from utils.resource_manager import resource_manager as res
 
 
 # Merge single result files in one final 'result.json' (eseguita come Cloud Function al trigger di GCS, cioè ogni volta che un file 'result' viene creato)
 def merge_handler(event, context):
-    prefix = res.gcs_batch_result_dir + "/"     # prefisso file "interessanti" (i trigger osservano l'intero bucket, non esiste un filtro più restrittivo)
+    # prefissi file "interessanti"
+    # NB: usati come filtro aggiuntivo come complemento dei trigger (essi possono osservare i cambiamenti a livello bucket ma non al di sotto di esso, cioè le singole cartelle)
+    results_prefix = res.gcs_batch_result_dir + "/"
+    metrics_prefix = res.gcs_metrics_dir + "/"
 
     try:
-        # Estrazione sorgenti evento
+        # Parametri dell'origine dell'evento trigger
         bucket_name = event['bucket']
         object_name = event["name"]
 
-        if not object_name.startswith(prefix):
+        if not object_name.startswith(results_prefix):
             return
         
-        # Estrazione dei batch result
+        # Estrazione file (risultati e metriche)
         bucket = storage.Client().bucket(bucket_name)
-        blobs = list(bucket.list_blobs(prefix=prefix))
+        res_blobs = list(bucket.list_blobs(prefix=results_prefix))
+        met_blobs = list(bucket.list_blobs(prefix=metrics_prefix))
     
-        if not blobs:
+        if not res_blobs:
             return
 
         # Estrazione metadati
         try:
-            dataset_name = os.path.basename(blobs[0].name).split("_result_")[0]     # es: "ABC_result_0.jsonl" -> "ABC"
-            metadata_blob = bucket.blob(posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json"))
-            metadata = json.loads(metadata_blob.download_as_text())
+            dataset_name = os.path.basename(res_blobs[0].name).split("_result_")[0]     # es: "ABC_result_0.jsonl" -> "ABC"
+            metadata = gcs.get_metadata(dataset_name)
             
         except IndexError:
             return  # nessun log in quanto è un errore senza effetti negativi, legato all'esecuzione parallela dell CRF
@@ -43,31 +48,31 @@ def merge_handler(event, context):
             res.logger.warning("[CRF][main][merge_handler] -> 'n_batches' is undefined in the configuration file on GCS")
             return
         
-        n_blobs = len(blobs)
+        n_blobs = len(res_blobs)
         if n_blobs < expected_batches:
             res.logger.info(f"[CRF][main][merge_handler] -> Found only {n_blobs}/{expected_batches} files")
             return
         
-        res.logger.info(f"[CRF][main][merge_handler] -> Merging {n_blobs} batch result files")
-
-        # Unione dei file result temporanei
-        merged_alerts = []
-        for blob in blobs:
-            try:
-                lines = blob.download_as_text().strip().splitlines()
-                merged_alerts.extend(json.loads(line) for line in lines)
-                
-            except Exception as e:
-                res.logger.error(f"[CRF][main][merge_handler] -> Failed to parse '{blob.name}' ({type(e)}.__name__): {str(e)}")
-
-        # Upload file unificato su GCS
+        # Unificazione e upload file JSON
+        res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch result files in '{gcs_result_path}'")
+        result_generator = mrg.stream_jsonl_blobs(res_blobs)
         gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
-        bucket.blob(gcs_result_path).upload_from_string(
-            json.dumps(merged_alerts, indent=2),
-            content_type="application/json"
+        gcs.upload_jsonl_data(
+            bucket,
+            gcs_result_path,
+            result_generator
         )
 
-        res.logger.info(f"[CRF][main][merge_handler] -> {len(merged_alerts)} alerts saved in '{gcs_result_path}'")
+        # Unificazione e upload file CSV
+        res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch metrics files in '{gcs_metrics_path}'")
+        merged_metrics = mrg.merge_csv_blobs(met_blobs)
+        gcs_metrics_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_metrics.csv")
+        gcs.upload_csv_data(
+            bucket,
+            gcs_metrics_path,
+            merged_metrics,
+            fieldnames=["batch_id", "n_alerts", "time_sec", "ram_mb"]
+        )
 
     except Exception as e:
         res.logger.error(f"[CRF][main][merge_handler] -> Error ({type(e).__name__}): {str(e)}")
