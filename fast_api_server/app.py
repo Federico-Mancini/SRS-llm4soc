@@ -167,7 +167,8 @@ async def upload_dataset(file: UploadFile = File(...)):
 async def analyze_dataset(dataset_filename: str = Query(...)):
     try:
         # Pulizia e preparazione
-        gcs.empty_dir(res.gcs_batch_result_dir) # svuotamento directory dei batch result file
+        gcs.empty_dir(res.gcs_batch_metrics_dir)    # svuotamento directory dei batch metrics file
+        gcs.empty_dir(res.gcs_batch_result_dir)     # svuotamento directory dei batch result file
 
         # Estrazione metadati da dataset
         metadata = get_metadata(dataset_filename)

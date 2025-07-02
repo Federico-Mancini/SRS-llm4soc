@@ -40,17 +40,8 @@ def load_batch(path: str, start_row: int, end_row: int, chunksize: int) -> pd.Da
     #   batch_df = df.iloc[start_row:end_row]
 
 
-# Upload sincrono di lista di oggetti JSON su GCS
-def upload_as_jsonl(path: str, data: list[dict]):
-    blob = res.bucket.blob(path)
-    blob.upload_from_string(
-        "\n".join(json.dumps(obj) for obj in data),
-        content_type="application/json"
-    )
-
-
 # Upload asincrono di lista di oggetti JSON su GCS
-async def upload_as_jsonl_async(path: str, data: list[dict]):
+async def upload_as_jsonl(path: str, data: list[dict]):
     await asyncio.to_thread(
         lambda: res.bucket.blob(path).upload_from_string(
             "\n".join(json.dumps(obj) for obj in data),

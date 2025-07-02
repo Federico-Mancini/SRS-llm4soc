@@ -17,6 +17,7 @@ class ResourceManager:
         self._gcs_dataset_dir = "input_datasets"
         self._gcs_metrics_dir = "metrics"
         self._gcs_result_dir = "results"
+        self._gcs_batch_metrics_dir = "batch_metrics"
         self._gcs_batch_result_dir = "batch_results"
         self._config_filename = "config.json"
         self._vms_config_path = "assets/config.json"
@@ -45,6 +46,7 @@ class ResourceManager:
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_metrics_dir = conf.get("gcs_metrics_dir", self._gcs_metrics_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
+        self._gcs_batch_metrics_dir = conf.get("gcs_batch_metrics_dir", self._gcs_batch_metrics_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
         self._config_filename = conf.get("config_filename", self._config_filename)
         self._vms_config_path = conf.get("vms_config_path", self._vms_config_path)
@@ -92,6 +94,10 @@ class ResourceManager:
     @property
     def gcs_result_dir(self):
         return self._gcs_result_dir
+    
+    @property
+    def gcs_batch_metrics_dir(self):
+        return self._gcs_batch_metrics_dir
     
     @property
     def gcs_batch_result_dir(self):

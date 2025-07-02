@@ -69,7 +69,7 @@ async def run_batch(request: Request):
         
         # Salvataggio risultati su GCS
         batch_results_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
-        await gcs.upload_as_jsonl_async(batch_results_path, batch_results)    # 'batch_results' è una lista di oggetti JSON
+        await gcs.upload_as_jsonl(batch_results_path, batch_results)    # 'batch_results' è una lista di oggetti JSON
 
         res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")
 
