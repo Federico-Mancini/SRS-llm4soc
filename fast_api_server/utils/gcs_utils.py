@@ -4,6 +4,38 @@ import pandas as pd
 from utils.resource_manager import resource_manager as res
 
 
+# Costruzione path remoto di un file 'result' o 'metrics'
+def get_blob_path(dataset_filename: str, suffix: str) -> str | None:
+    if suffix not in ["result", "metrics"]:
+        return None
+    dataset_name = os.path.splitext(dataset_filename)[0]
+    return posixpath.join(res.gcs_result_dir, f"{dataset_name}_{suffix}.json")
+
+
+# Download file remoto in locale
+def download_to_local(blob_path: str, local_path: str) -> str | None:
+    blob = res.bucket.blob(blob_path)
+
+    # Controllo esistenza file remoto
+    if not blob.exists():
+        return f"[VMS][gcs_utils][download_to_local] -> File '{blob_path}' not found"
+        
+    blob.download_to_filename(local_path)
+
+    # Controllo esistenza file locale
+    if not os.path.exists(local_path):
+        return f"[VMS][gcs_utils][download_to_local] -> Downloaded file not found locally in '{local_path}'"
+    
+
+# Lettura file JSON locale
+def read_local_json(local_path: str) -> list | dict:    # se nel file c'è un solo oggetto, sarà restituito un 'dict', altrimenti una 'list[dict]'
+    with open(local_path, "r") as f:
+        data = json.load(f)
+
+    res.logger.info(f"[VMS][gcs_utils][read_local_json] -> File '{local_path}' read")
+    return data
+
+
 # Svuotamento directory
 def empty_dir(gcs_dir: str):
     blobs = res.bucket.list_blobs(prefix=f"{gcs_dir}/")

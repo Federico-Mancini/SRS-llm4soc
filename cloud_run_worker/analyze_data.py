@@ -1,5 +1,6 @@
 import json, time, asyncio
 import pandas as pd
+import utils.gcs_utils as gcs
 import utils.performance_monitor as pm
 
 from utils.resource_manager import resource_manager as res
@@ -128,10 +129,6 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
 
     try:
         # Trasformazione dei record del dataframe in lista di oggetti json
-        # alerts = [
-        #     dict(zip(batch_df.columns, row))
-        #     for row in batch_df.itertuples(index=False, name=None)
-        # ]
         alerts = batch_df.to_dict(orient='records') 
 
         # Parallelizzazione delle analisi sugli alert
@@ -144,8 +141,8 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
         
         # Metriche
         metrics = pm.finalize_monitoring(start, batch_id, len(batch_df))
-        metrics_path = f"{res.gcs_metrics_dir}/{dataset_name}_batch_{batch_id}.csv"
-        pm.upload_metrics_to_gcs([metrics], metrics_path)   # NB: passare le metriche dentro una lista
+        metrics_path = f"{res.gcs_batch_metrics_dir}/{dataset_name}_batch_{batch_id}.jsonl"
+        await gcs.upload_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
         
         res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, Time elapsed: {metrics['time_sec']}s, RAM usage: {metrics['ram_mb']}MB")
 

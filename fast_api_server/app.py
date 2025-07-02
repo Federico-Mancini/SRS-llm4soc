@@ -1,6 +1,7 @@
 # VMS: Virtual Machine Server
 
 import os ,json, posixpath
+import pandas as pd
 import utils.gcs_utils as gcs
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query
@@ -185,80 +186,41 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
 # Visualizzazione file con alert classificati
 @app.get("/result")
 def get_result(dataset_filename: str = Query(...)):
-    dataset_name = os.path.splitext(dataset_filename)[0]
-    gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
+    blob_path = gcs.get_blob_path(dataset_filename, "result")
+    local_path = res.vms_result_path
     
-    # Controllo esistenza file remoto
-    blob = res.bucket.blob(gcs_result_path)
-    
-    if not blob.exists():
-        msg = f"[VMS][app][get_result] -> File '{gcs_result_path}' not found"
-        res.logger.warning(msg)
-        raise HTTPException(status_code=404, detail=msg)
+    msg = gcs.download_to_local(blob_path, local_path)
 
-    # Download file in locale
-    blob.download_to_filename(res.vms_result_path)
-
-    if not os.path.exists(res.vms_result_path):
-        msg = f"[VMS][app][get_result] -> Downloaded file not found locally in '{res.vms_result_path}'"
+    if not msg:
         res.logger.warning(msg)
         raise HTTPException(status_code=404, detail=msg)
     
     # Lettura dati
     try:
-        with open(res.vms_result_path, "r") as f:
-            data = json.load(f)
-
-        res.logger.info(f"[VMS][app][get_result] -> File '{res.vms_result_path}' read")
-        return data
-    
-    except json.JSONDecodeError as e:
-        msg = f"[VMS][app][get_result] -> Failed to parse '{res.vms_result_path}' ({type(e).__name__}): {str(e)}"
-        res.logger.error(msg)
-        raise HTTPException(status_code=500, detail=msg)
-    
+        return gcs.read_local_json(local_path)
     except Exception as e:
-        msg = f"[VMS][app][get_result] -> Failed to read '{res.vms_result_path}' ({type(e).__name__}): {str(e)}"
+        msg = f"[VMS][app][get_result] -> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
 
 # Visualizzazione file con metriche
 @app.get("/metrics")
-def get_result(dataset_filename: str = Query(...)):
-    dataset_name = os.path.splitext(dataset_filename)[0]
-    gcs_metrics_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_metrics.csv")
-    
-    # Controllo esistenza file remoto
-    blob = res.bucket.blob(gcs_result_path)
-    
-    if not blob.exists():
-        msg = f"[VMS][app][get_result] -> File '{gcs_result_path}' not found"
+def get_metrics(dataset_filename: str = Query(...)):
+    blob_path = gcs.get_blob_path(dataset_filename, "metrics")
+    local_path = res.vms_metrics_path
+
+    msg = gcs.download_to_local(blob_path, local_path)
+
+    if not msg:
         res.logger.warning(msg)
         raise HTTPException(status_code=404, detail=msg)
-
-    # Download file in locale
-    blob.download_to_filename(res.vms_result_path)
-
-    if not os.path.exists(res.vms_result_path):
-        msg = f"[VMS][app][get_result] -> Downloaded file not found locally in '{res.vms_result_path}'"
-        res.logger.warning(msg)
-        raise HTTPException(status_code=404, detail=msg)
-    
+        
     # Lettura dati
     try:
-        with open(res.vms_result_path, "r") as f:
-            data = json.load(f)
-
-        res.logger.info(f"[VMS][app][get_result] -> File '{res.vms_result_path}' read")
-        return data
-    
-    except json.JSONDecodeError:
-        msg = f"[VMS][app][get_result] -> Failed to parse '{res.vms_result_path}' ({type(e).__name__}): {str(e)}"
-        res.logger.error(msg)
-        raise HTTPException(status_code=500, detail=msg)
-    
+        return gcs.read_local_json(local_path)
     except Exception as e:
-        msg = f"[VMS][app][get_result] -> Failed to read '{res.vms_result_path}' ({type(e).__name__}): {str(e)}"
+        msg = f"[VMS][app][get_metrics] -> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
+    

@@ -8,12 +8,14 @@
   "gcs_cache_dir": "cache",
   "gcs_metrics_dir": "metrics",
   "gcs_result_dir": "results",
+  "gcs_batch_metrics_dir": "batch_metrics",
   "gcs_batch_result_dir": "batch_results",
 
   "config_filename": "config.json",
   "result_filename": "result.json",
 
   "vms_config_path": "assets/config.json",
+  "vms_metrics_path": "assets/metrics.json",
   "vms_result_path": "assets/result.json",
 
   "project_id": "gruppo-4-456912",

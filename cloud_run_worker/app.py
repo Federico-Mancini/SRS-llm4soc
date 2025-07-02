@@ -61,7 +61,7 @@ async def run_batch(request: Request):
         batch_id, start_row, end_row, batch_size, dataset_name, dataset_path = (body[field] for field in required_fields)
 
         # Download e suddivisione del dataset
-        batch_df = gcs.load_batch_from_jsonl(dataset_path, start_row, end_row, batch_size)
+        batch_df = gcs.load_batch(dataset_path, start_row, end_row, batch_size)
 
         # Classificazione alert del batch
         batch_results = await analyze_batch(batch_df, batch_id, start_row, dataset_name)
@@ -73,7 +73,7 @@ async def run_batch(request: Request):
         #     "\n".join(json.dumps(obj) for obj in batch_results),
         #     content_type="application/json"
         # )
-        await gcs.save_batch_results_async(batch_results_path, batch_results)
+        await gcs.upload_jsonl(batch_results_path, batch_results)    # 'batch_results' è una lista di oggetti JSON
 
         res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")
 

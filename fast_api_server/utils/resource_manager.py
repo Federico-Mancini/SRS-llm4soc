@@ -19,6 +19,7 @@ class ResourceManager:
         self._gcs_batch_result_dir = "batch_results"
         self._config_filename = "config.json"
         self._vms_config_path = "assets/config.json"
+        self._vms_metrics_path = "assets/metrics.json"
         self._vms_result_path = "assets/result.json"
         self._project_id = ""
         self._location = ""
@@ -45,6 +46,7 @@ class ResourceManager:
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
         self._config_filename = conf.get("config_filename", self._config_filename)
         self._vms_config_path = conf.get("vms_config_path", self._vms_config_path)
+        self._vms_metrics_path = conf.get("vms_metrics_path", self._vms_metrics_path)
         self._vms_result_path = conf.get("vms_result_path", self._vms_result_path)
         self._project_id = conf.get("project_id", self._project_id)
         self._location = conf.get("location", self._location)
@@ -96,7 +98,11 @@ class ResourceManager:
     @property
     def vms_config_path(self):
         return self._vms_config_path
-    
+
+    @property
+    def vms_metrics_path(self):
+        return self._vms_metrics_path
+
     @property
     def vms_result_path(self):
         return self._vms_result_path

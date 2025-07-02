@@ -5,7 +5,7 @@ from utils.resource_manager import resource_manager as res
 
 
 # Caricamento del solo chunk d'interesse dal dataset su GCS (previene memory leaks in RAM)
-def load_batch_from_jsonl(path: str, start_row: int, end_row: int, chunksize: int) -> pd.DataFrame:
+def load_batch(path: str, start_row: int, end_row: int, chunksize: int) -> pd.DataFrame:
     stream = io.BytesIO(res.bucket.blob(path).download_as_bytes())
 
     batch_data = []
@@ -41,17 +41,13 @@ def load_batch_from_jsonl(path: str, start_row: int, end_row: int, chunksize: in
 
 
 # Upload asincrono su GCS
-async def save_batch_results_async(path: str, data: list[dict]):
-    try:
-        await asyncio.to_thread(
-            lambda: res.bucket.blob(path).upload_from_string(
-                "\n".join(json.dumps(obj) for obj in data),
-                content_type="application/json"
-            )
+async def upload_jsonl(path: str, data: list[dict]):
+    await asyncio.to_thread(
+        lambda: res.bucket.blob(path).upload_from_string(
+            "\n".join(json.dumps(obj) for obj in data),
+            content_type="application/json"
         )
-    except Exception as e:
-        res.logger.error("errore in 'save_batch_results_async'")
-        raise
+    )
     # Nota:
     # Questa funzione consente di non dover aspettare il termine dell'operazione di upload dati in caso venga ricevuta
     # una seconda richiesta di upload. In questo modo, le operazioni partono in parallelo invece che attendere la fine
