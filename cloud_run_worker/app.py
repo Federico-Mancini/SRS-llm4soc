@@ -1,6 +1,6 @@
 # CRW: Cloud Run Worker
 
-import asyncio, posixpath
+import json, asyncio, posixpath
 import utils.gcs_utils as gcs
 
 from fastapi import FastAPI, HTTPException, Request
@@ -45,6 +45,8 @@ async def run_alert(req: Request):
 # Operazioni: estrazione batch dal dataset remoto -> classificazione alert -> creazione file result temporaneo
 @app.post("/run-batch")
 async def run_batch(request: Request):
+    print("[CRW] ok 0")
+
     try:
         body = await request.json()
 
@@ -75,7 +77,11 @@ async def run_batch(request: Request):
         
         # Salvataggio risultati su GCS
         batch_results_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
-        await gcs.save_batch_results_async(res.bucket, batch_results_path, batch_results)
+        res.bucket.blob(batch_results_path).upload_from_string(
+            "\n".join(json.dumps(obj) for obj in batch_results),
+            content_type="application/json"
+        )
+        #await gcs.save_batch_results_async(res.bucket, batch_results_path, batch_results)
 
         res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")
 
