@@ -1,4 +1,5 @@
 pandas
+psutil
 fastapi
 uvicorn[standard]
 google-cloud-aiplatform

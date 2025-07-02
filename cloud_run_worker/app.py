@@ -1,7 +1,6 @@
 # CRW: Cloud Run Worker
 
-import io, json, asyncio, posixpath
-import pandas as pd
+import asyncio, posixpath
 import utils.gcs_utils as gcs
 
 from fastapi import FastAPI, HTTPException, Request
