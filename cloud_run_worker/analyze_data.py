@@ -128,11 +128,11 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
 
     try:
         # Trasformazione dei record del dataframe in lista di oggetti json
-        alerts = [
-            dict(zip(batch_df.columns, row))
-            for row in batch_df.itertuples(index=False, name=None)
-        ]
-        #alerts = batch_df.to_dict(orient='records') 
+        # alerts = [
+        #     dict(zip(batch_df.columns, row))
+        #     for row in batch_df.itertuples(index=False, name=None)
+        # ]
+        alerts = batch_df.to_dict(orient='records') 
 
         # Parallelizzazione delle analisi sugli alert
         tasks = [
@@ -143,9 +143,9 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
         results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
         
         # Metriche
-        metrics = [pm.finalize_monitoring(start, batch_id, len(batch_df))]
-        metrics_path = f"{res.gcs_metrics_dir}/{dataset_name}_batch_{batch_id}.csv"
-        pm.upload_metrics_to_gcs(metrics, metrics_path)
+        metrics = pm.finalize_monitoring(start, batch_id, len(batch_df))
+        # metrics_path = f"{res.gcs_metrics_dir}/{dataset_name}_batch_{batch_id}.csv"
+        # pm.upload_metrics_to_gcs(metrics, metrics_path)
         
         res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, Time elapsed: {metrics['time_sec']}s, RAM usage: {metrics['ram_mb']}MB")
 
