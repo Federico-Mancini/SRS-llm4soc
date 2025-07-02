@@ -25,8 +25,10 @@ def stream_jsonl_blobs(blobs: List[storage.Blob]):
 
 # Upload JSONL files as one JSON
 def upload_json(bucket: storage.Bucket, path: str, data_gen):
-    blob = bucket.blob(path)    
+    blob = bucket.blob(path)
+    print(f"CRF - data_gen: {data_gen}")
     data = list(data_gen)
+    print(f"CRF - data: {data}")
     blob.upload_from_string(
         json.dumps(data, indent=2),
         content_type="application/json"
