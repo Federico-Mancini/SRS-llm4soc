@@ -54,7 +54,7 @@ def merge_handler(event, context):
             return
         
         gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
-        gcs_metrics_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_metrics.csv")
+        gcs_metrics_path = posixpath.join(res.gcs_metrics_dir, f"{dataset_name}_metrics.csv")
 
         # Unificazione e upload file JSON (batch result file)
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch result files in '{gcs_result_path}'")

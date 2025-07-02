@@ -13,9 +13,12 @@ def get_metadata(bucket: storage.Bucket, dataset_name: str) -> dict:
 
 # Upload file JSON
 def upload_jsonl_data(bucket: storage.Bucket, path: str, data_gen):
-    blob = bucket.blob(path)
-    output = "\n".join(json.dumps(obj) for obj in data_gen)
-    blob.upload_from_string(output, content_type="application/json")
+    blob = bucket.blob(path)    
+    data = list(data_gen)
+    blob.upload_from_string(
+        json.dumps(data, indent=2),
+        content_type="application/json"
+    )
 
 
 # Upload file CSV
