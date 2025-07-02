@@ -53,10 +53,12 @@ def merge_handler(event, context):
             res.logger.info(f"[CRF][main][merge_handler] -> Found only {n_blobs}/{expected_batches} files")
             return
         
+        gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
+        gcs_metrics_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_metrics.csv")
+
         # Unificazione e upload file JSON (batch result file)
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch result files in '{gcs_result_path}'")
         result_generator = mrg.stream_jsonl_blobs(res_blobs)
-        gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
         gcs.upload_jsonl_data(
             bucket,
             gcs_result_path,
@@ -66,7 +68,6 @@ def merge_handler(event, context):
         # Unificazione e upload file CSV (batch metrics file)
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch metrics files in '{gcs_metrics_path}'")
         merged_metrics = mrg.merge_csv_blobs(met_blobs)
-        gcs_metrics_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_metrics.csv")
         gcs.upload_csv_data(
             bucket,
             gcs_metrics_path,
