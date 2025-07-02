@@ -5,9 +5,9 @@ from utils.resource_manager import resource_manager as res
 
 
 # Estrazione metadati di dataset pre-caricato su GCS
-def get_metadata(dataset_name: str) -> dict:
+def get_metadata(bucket: storage.Bucket, dataset_name: str) -> dict:
     metadata_path = posixpath.join(res.gcs_dataset_dir, f"{dataset_name}_metadata.json")
-    metadata_text = res.bucket.blob(metadata_path).download_as_text()
+    metadata_text = bucket.blob(metadata_path).download_as_text()
     return json.loads(metadata_text)
 
 
@@ -19,7 +19,7 @@ def upload_jsonl_data(bucket: storage.Bucket, path: str, data_gen):
 
 
 # Upload file CSV
-def upload_csv_data(bucket, path: str, data: list, fieldnames: list):
+def upload_csv_data(bucket: storage.Bucket, path: str, data: list, fieldnames: list):
     blob = bucket.blob(path)
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=fieldnames)

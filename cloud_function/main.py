@@ -34,7 +34,7 @@ def merge_handler(event, context):
         # Estrazione metadati
         try:
             dataset_name = os.path.basename(res_blobs[0].name).split("_result_")[0]     # es: "ABC_result_0.jsonl" -> "ABC"
-            metadata = gcs.get_metadata(dataset_name)
+            metadata = gcs.get_metadata(bucket, dataset_name)
             
         except IndexError:
             return  # nessun log in quanto è un errore senza effetti negativi, legato all'esecuzione parallela dell CRF
