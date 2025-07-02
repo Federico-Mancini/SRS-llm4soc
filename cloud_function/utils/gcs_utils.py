@@ -1,6 +1,5 @@
 import json, posixpath
 
-from typing import List
 from google.cloud import storage
 from utils.resource_manager import resource_manager as res
 
@@ -13,7 +12,7 @@ def get_metadata(bucket: storage.Bucket, dataset_name: str) -> dict:
 
 
 # Estrazione dati da file multipli per creare uno stream di entry JSONL
-def stream_jsonl_blobs(blobs: List[storage.Blob]):
+def stream_jsonl_blobs(blobs: list[storage.Blob]):
     for blob in blobs:
         try:
             lines = blob.download_as_text().strip().splitlines()

@@ -146,7 +146,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
         metrics_path = f"{res.gcs_batch_metrics_dir}/{dataset_name}_metrics_{batch_id}.jsonl"
         await gcs.upload_as_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
         
-        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, Time elapsed: {metrics['time_sec']}s, RAM usage: {metrics['ram_mb']}MB")
+        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, RAM usage: {metrics['ram_mb']}MB, Time elapsed: {metrics['time_sec']}s")
 
         return results
 

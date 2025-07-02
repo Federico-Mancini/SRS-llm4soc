@@ -20,6 +20,7 @@ def finalize_monitoring(start_time, batch_id, n_alerts) -> dict:
     return {
         "batch_id": batch_id,
         "n_alerts": n_alerts,
+        "ram_mb": round(ram, 2),        # spazio d'archiviazione usato in RAM durante l'analisi (MB)
         "time_sec": round(elapsed, 2),  # tempo impiegato per analizzare il batch (secondi)
-        "ram_mb": round(ram, 2)         # spazio d'archiviazione usato in RAM durante l'analisi (MB)
+        "timestamp": time.time()
     }
