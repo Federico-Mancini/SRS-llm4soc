@@ -15,6 +15,7 @@ class ResourceManager:
         self._gcs_dataset_dir = "datasets"
         self._gcs_metrics_dir = "metrics"
         self._gcs_result_dir = "results"
+        self._gcs_batch_metrics_dir = "batch_metrics"
         self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
         self.initialize()
@@ -33,6 +34,7 @@ class ResourceManager:
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_metrics_dir = conf.get("gcs_metrics_dir", self._gcs_metrics_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
+        self._gcs_batch_metrics_dir = conf.get("gcs_batch_metrics_dir", self._gcs_batch_metrics_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
 
         self._initialized = True
@@ -55,6 +57,10 @@ class ResourceManager:
     def gcs_result_dir(self):
         return self._gcs_result_dir
     
+    @property
+    def gcs_batch_metrics_dir(self):
+        return self._gcs_batch_metrics_dir
+
     @property
     def gcs_batch_result_dir(self):
         return self._gcs_batch_result_dir

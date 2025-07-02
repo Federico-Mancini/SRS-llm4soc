@@ -11,7 +11,7 @@ from utils.resource_manager import resource_manager as res
 def merge_handler(event, context):
     # Filtra solo eventi legati ai result batch (complemento al trigger con osservabilità limitata all'intero bucket)
     results_prefix = res.gcs_batch_result_dir + "/"
-    metrics_prefix = res.gcs_metrics_dir + "/"
+    metrics_prefix = res.gcs_batch_metrics_dir + "/"
 
     try:
         # Parametri dell'origine dell'evento trigger
@@ -59,7 +59,7 @@ def merge_handler(event, context):
 
         # Unificazione e upload file CSV (batch metrics file)
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch metrics files in '{gcs_metrics_path}'")
-        metrics_data = list(gcs.stream_jsonl_blobs_2(met_blobs))
+        metrics_data = list(gcs.stream_jsonl_blobs(met_blobs))
         gcs.upload_json(bucket, gcs_metrics_path, metrics_data)
 
     except Exception as e:
