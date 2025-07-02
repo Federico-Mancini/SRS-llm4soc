@@ -61,7 +61,6 @@ def merge_handler(event, context):
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch metrics files in '{gcs_metrics_path}'")
         metrics_data = list(gcs.stream_jsonl_blobs(met_blobs))
         gcs.upload_json(bucket, gcs_metrics_path, metrics_data)
-        print(metrics_data)
 
     except Exception as e:
         res.logger.error(f"[CRF][main][merge_handler] -> Error ({type(e).__name__}): {str(e)}")

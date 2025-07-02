@@ -1,4 +1,6 @@
-import os, json, httpx
+import os, json
+
+from fastapi import HTTPException
 from utils.resource_manager import resource_manager as res
 
 
@@ -17,15 +19,15 @@ def download_to_local(blob_path: str, local_path: str):
 
     # Controllo esistenza file remoto
     if not blob.exists():
-        msg = f"[VMS][gcs_utils][download_to_local] -> File '{blob_path}' not found"
+        msg = f"File '{blob_path}' not found"
         res.logger.error(msg)
-        raise httpx.HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=404, detail=msg)
         
     blob.download_to_filename(local_path)
 
     # Controllo esistenza file locale
     if not os.path.exists(local_path):
-        msg = f"[VMS][gcs_utils][download_to_local] -> Downloaded file not found locally in '{local_path}'"
+        msg = f"Downloaded file not found locally in '{local_path}'"
         res.logger.error(msg)
-        raise httpx.HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=404, detail=msg)
     
