@@ -43,14 +43,12 @@ def load_batch_from_jsonl(path: str, start_row: int, end_row: int, chunksize: in
 # Upload asincrono su GCS
 async def save_batch_results_async(path: str, data: list[dict]):
     try:
-        print("[CRW] ok in save")
         await asyncio.to_thread(
             lambda: res.bucket.blob(path).upload_from_string(
                 "\n".join(json.dumps(obj) for obj in data),
                 content_type="application/json"
             )
         )
-        print("[CRW] ok save done")
     except Exception as e:
         res.logger.error("errore in 'save_batch_results_async'")
         raise

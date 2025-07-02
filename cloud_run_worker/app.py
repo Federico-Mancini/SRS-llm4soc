@@ -73,7 +73,7 @@ async def run_batch(request: Request):
         #     "\n".join(json.dumps(obj) for obj in batch_results),
         #     content_type="application/json"
         # )
-        await gcs.save_batch_results_async(res.bucket, batch_results_path, batch_results)
+        await gcs.save_batch_results_async(batch_results_path, batch_results)
 
         res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")
 
