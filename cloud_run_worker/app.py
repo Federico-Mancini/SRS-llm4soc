@@ -55,7 +55,9 @@ async def run_batch(request: Request):
         missing = [field for field in required_fields if field not in body or body[field] is None]
         
         if missing:
-            return {"error": f"Missing required fields: {', '.join(missing)}"}
+            msg = f"Missing required fields: {', '.join(missing)}"
+            res.logger.warning(msg)
+            raise HTTPException(status_code=500, detail=msg)
 
         batch_id, start_row, end_row, batch_size, dataset_name, dataset_path = (body[field] for field in required_fields)
 
@@ -65,15 +67,9 @@ async def run_batch(request: Request):
         # Download e suddivisione del dataset
         batch_df = gcs.load_batch_from_jsonl(dataset_path, start_row, end_row, batch_size)
 
-        print("[CRW] ok 2")
-        res.logger.info("[CRW] ok 2")
-
         # Classificazione alert del batch
         batch_results = await analyze_batch(batch_df, batch_id, start_row, dataset_name)
         #batch_result_list = await analyze_batch_cached(batch_df, batch_id, start_row, dataset_name) # TODO: testare efficacia cache su dataset più grandi
-        
-        print("[CRW] ok 3")
-        res.logger.info("[CRW] ok 3")
         
         # Salvataggio risultati su GCS
         batch_results_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
