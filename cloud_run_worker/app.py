@@ -49,20 +49,22 @@ async def run_batch(request: Request):
 
     try:
         body = await request.json()
+        print("[CRW] ok 1")
 
         # Controllo ed estrazione campi
         required_fields = ["batch_id", "start_row", "end_row", "batch_size", "dataset_name", "dataset_path"]
+        print("[CRW] ok 2")
         missing = [field for field in required_fields if field not in body or body[field] is None]
-        
+        print("[CRW] ok 3")
         if missing:
             msg = f"Missing required fields: {', '.join(missing)}"
             res.logger.warning(msg)
             raise HTTPException(status_code=500, detail=msg)
 
+        print("[CRW] ok 4")
         batch_id, start_row, end_row, batch_size, dataset_name, dataset_path = (body[field] for field in required_fields)
 
-        print("[CRW] ok 1")
-        res.logger.info("[CRW] ok 1")
+        print("[CRW] ok 5")
 
         # Download e suddivisione del dataset
         batch_df = gcs.load_batch_from_jsonl(dataset_path, start_row, end_row, batch_size)
