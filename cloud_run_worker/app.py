@@ -45,26 +45,20 @@ async def run_alert(req: Request):
 # Operazioni: estrazione batch dal dataset remoto -> classificazione alert -> creazione file result temporaneo
 @app.post("/run-batch")
 async def run_batch(request: Request):
-    print("[CRW] ok 0")
 
     try:
         body = await request.json()
-        print("[CRW] ok 1")
 
         # Controllo ed estrazione campi
         required_fields = ["batch_id", "start_row", "end_row", "batch_size", "dataset_name", "dataset_path"]
-        print("[CRW] ok 2")
         missing = [field for field in required_fields if field not in body or body[field] is None]
-        print("[CRW] ok 3")
+
         if missing:
             msg = f"Missing required fields: {', '.join(missing)}"
             res.logger.warning(msg)
             raise HTTPException(status_code=500, detail=msg)
 
-        print("[CRW] ok 4")
         batch_id, start_row, end_row, batch_size, dataset_name, dataset_path = (body[field] for field in required_fields)
-
-        print("[CRW] ok 5")
 
         # Download e suddivisione del dataset
         batch_df = gcs.load_batch_from_jsonl(dataset_path, start_row, end_row, batch_size)
@@ -75,11 +69,11 @@ async def run_batch(request: Request):
         
         # Salvataggio risultati su GCS
         batch_results_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
-        res.bucket.blob(batch_results_path).upload_from_string(
-            "\n".join(json.dumps(obj) for obj in batch_results),
-            content_type="application/json"
-        )
-        #await gcs.save_batch_results_async(res.bucket, batch_results_path, batch_results)
+        # res.bucket.blob(batch_results_path).upload_from_string(
+        #     "\n".join(json.dumps(obj) for obj in batch_results),
+        #     content_type="application/json"
+        # )
+        await gcs.save_batch_results_async(res.bucket, batch_results_path, batch_results)
 
         res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")
 

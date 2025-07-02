@@ -11,10 +11,7 @@ def load_batch_from_jsonl(path: str, start_row: int, end_row: int, chunksize: in
     batch_data = []
     current_index = 0
 
-    print("start gcs load")
-
     for chunk in pd.read_json(stream, lines=True, chunksize=chunksize):
-        print("in gcs load for")
         chunk_len = len(chunk)
         chunk_start = current_index
         chunk_end = current_index + chunk_len
@@ -32,10 +29,8 @@ def load_batch_from_jsonl(path: str, start_row: int, end_row: int, chunksize: in
         current_index = chunk_end
 
     if not batch_data:
-        print("gcs load empty df")
         return pd.DataFrame()
 
-    print("gcs load done")
     return pd.concat(batch_data, ignore_index=True)
     # Nota:
     # Questa funzione estrae la sezione di dataset desiderata, senza caricare l'intero dataset in memoria RAM

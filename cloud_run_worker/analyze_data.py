@@ -75,7 +75,7 @@ def process_model_response(text: str, alert: dict, alert_id: int = 0) -> dict:
         }
 
 # Analisi alert per l'endpoint '/chat'
-def analyze_one_alert(alert) -> dict:
+def analyze_one_alert(alert: dict) -> dict:
     prompt = build_prompt(alert)
 
     try:
@@ -91,7 +91,7 @@ def analyze_one_alert(alert) -> dict:
         }
 
 # Analisi asincrona i-esimo alert di batch
-async def analyze_batch_alert(i, alert, semaphore) -> dict:
+async def analyze_batch_alert(i: int, alert: dict, semaphore) -> dict:
     prompt = build_prompt(alert)
     
     async with semaphore:
@@ -128,11 +128,11 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
 
     try:
         # Trasformazione dei record del dataframe in lista di oggetti json
-        # alerts = [
-        #     dict(zip(batch_df.columns, row))
-        #     for row in batch_df.itertuples(index=False, name=None)
-        # ]
-        alerts = batch_df.to_dict(orient='records') 
+        alerts = [
+            dict(zip(batch_df.columns, row))
+            for row in batch_df.itertuples(index=False, name=None)
+        ]
+        #alerts = batch_df.to_dict(orient='records') 
 
         # Parallelizzazione delle analisi sugli alert
         tasks = [
