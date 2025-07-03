@@ -11,7 +11,7 @@ from utils.resource_manager import resource_manager as res
 from utils.benchmark_utils import run_benchmark
 from utils.cloud_utils import call_worker, enqueue_batch_analysis_tasks
 from utils.io_utils import read_local_json, download_to_local
-from utils.metadata_utils import create_metadata, get_metadata
+from utils.metadata_utils import create_metadata, download_metadata, upload_metadata
 
 
 DEFAULT_BATCH_SIZE_SUP = 500
@@ -57,14 +57,13 @@ async def block_root():
 
 
 # Check di stato di server (VM) e worker (Cloud Run)
-@app.get("/server-status")
-async def check_status():
+@app.get("/health")
+async def health_check():
     try:
-        data = await call_worker("GET", res.worker_url+ "/check-status")
+        data = await call_worker("GET", f"{res.worker_url}/check-status")
         msg = data.get("status", "unknown")
-
     except Exception as e:
-        msg = f"[VMS][app][check_status] -> Error ({type(e).__name__}): {str(e)}"
+        msg = f"[VMS][app][health_check] -> {type(e).__name__}: {str(e)}"
         res.logger.error(msg)
 
     return {"server (VMS)": "running", "worker (CRW)": msg}
@@ -74,10 +73,10 @@ async def check_status():
 @app.get("/batch-results-status")
 async def check_batch_results():
     try:
-        blobs = res.bucket.list_blobs(prefix=res.gcs_batch_result_dir + "/")        
+        blobs = res.bucket.list_blobs(prefix=res.gcs_batch_result_dir + "/")
         count = 0
         dataset_name = None
-        metadata = None
+        metadata = {}
         
         for blob in blobs:
             filename = os.path.basename(blob.name)
@@ -87,9 +86,18 @@ async def check_batch_results():
             
                 if not dataset_name:
                     dataset_name = os.path.basename(blob.name).split("_result_")[0]     # es: "ABC_result_0.jsonl" -> "ABC"
-                    metadata = get_metadata(dataset_name)
+                    metadata = download_metadata(dataset_name) or {}
         
-        batches = metadata.get("num_batches") if metadata else -1
+        batches = metadata.get("num_batches")
+        if not isinstance(batches, int) or batches <= 0:
+            msg = (
+                "Undefined 'num_batches' field in dataset metadata. "
+                "The dataset may never have been analyzed, or the metadata might have been deleted or altered. "
+                "Try analyzing the dataset or re-uploading it to regenerate the metadata file"
+            )
+            res.logger.error(msg)
+            raise ValueError(msg)
+
         status = "pending" if count == 0 else "partial" if count < batches else "completed"
         completion_rate = f"{count}/{batches} batches analyzed" if batches > 0 else res.not_available
 
@@ -100,7 +108,7 @@ async def check_batch_results():
         }
 
     except Exception as e:
-        msg = f"[VMS][app][monitor_batch_results] -> Error ({type(e).__name__}): {str(e)}"
+        msg = f"[VMS][app][check_batch_results] -> {type(e).__name__}: {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
@@ -182,8 +190,15 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         gcs.empty_dir(res.gcs_batch_metrics_dir)    # svuotamento directory dei batch metrics file
         gcs.empty_dir(res.gcs_batch_result_dir)     # svuotamento directory dei batch result file
 
-        # Estrazione metadati da dataset
-        metadata = get_metadata(dataset_filename)
+        # Lettura metadati del dataset
+        metadata = download_metadata(dataset_filename)
+        batch_size = res.batch_size                 # dato estratto qui per avere il valore più recente/aggiornato (invece che in 'create_metadata')
+        n_batches = max(1, (metadata["num_rows"] + batch_size - 1) // batch_size)
+
+        metadata["num_batches"] = n_batches         # assegnazione dei dati mancanti
+        metadata["batch_size"] = batch_size
+
+        upload_metadata(dataset_filename, metadata) # upload dei nuovi metadati su GCS
         
         # Creazione e analisi dei singoli batch tramite Cloud Task
         enqueue_batch_analysis_tasks(metadata)
@@ -195,7 +210,7 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         }
     
     except Exception as e:
-        msg = f"[VMS][app][analyze_dataset] -> Error ({type(e).__name__}): {str(e)}"
+        msg = f"[VMS][app][analyze_dataset] -> {type(e).__name__}: {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 

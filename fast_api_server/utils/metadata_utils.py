@@ -30,25 +30,28 @@ def create_metadata(dataset_filename: str) -> dict:
         res.logger.warning(msg)
         raise ValueError(msg)
 
-    # Conteggio batch da generare
-    num_rows = df.shape[0]
-    batch_size = res.batch_size
-    n_batches = max(1, (num_rows + batch_size - 1) // batch_size)
-
     return {
-        "num_rows": num_rows,
+        "dataset_name": dataset_name,
+        "dataset_path": gcs_dataset_path,
+        "num_rows": df.shape[0],
         "num_columns": df.shape[1],
         "features": df.columns.tolist(),
-        "num_batches": n_batches,
-        "batch_size": batch_size,
-        "content_type": blob.content_type,
-        "dataset_name": dataset_name,
-        "dataset_path": gcs_dataset_path
+        "content_type": blob.content_type
     }
 
 
-# Estrazione metadati di dataset pre-caricato su GCS
-def get_metadata(dataset_filename: str) -> dict:
+# Download metadati da GCS
+def download_metadata(dataset_filename: str) -> dict:
     path = gcs.get_blob_path(res.gcs_dataset_dir, dataset_filename, "metadata", "json")
     metadata_text = res.bucket.blob(path).download_as_text()
     return json.loads(metadata_text)
+
+
+# Upload metadati locali su GCS
+def upload_metadata(dataset_filename: str, metadata: dict) -> None:
+    path = gcs.get_blob_path(res.gcs_dataset_dir, dataset_filename, "metadata", "json")
+    blob = res.bucket.blob(path)
+    blob.upload_from_string(
+        json.dumps(metadata, indent=2),
+        content_type="application/json"
+    )
