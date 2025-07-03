@@ -1,5 +1,19 @@
-# Calcolo durata totale di analisi del dataset
-def compute_duration(metrics: list[dict]) -> str:
+import statistics
+from resource_manager import resource_manager as res
+
+
+# Formattazione dati finali visualizzati nella risposta HTTP
+def format_metrics(value, suffix: str = "", precision: int = 2, fallback=res.not_available) -> str:
+    try:
+        if value is None or value == fallback:
+            return fallback
+        return f"{value:.{precision}f} {suffix}".strip()
+    except (TypeError, ValueError):
+        return fallback
+
+
+# Calcolo durata totale di analisi dataset
+def compute_duration(metrics: list[dict]):
     earliest_start = None   # timestamp di inizio analisi del primo batch
     latest_end = None       # timestamp di fine analisi dell'ultimo batch
 
@@ -21,15 +35,14 @@ def compute_duration(metrics: list[dict]) -> str:
                 latest_end = batch_end_time
 
     if earliest_start is None or latest_end is None:
-        return "n/a"
+        return None
 
-    total_duration = latest_end - earliest_start
-    return f"{total_duration:.2f} sec"
+    return latest_end - earliest_start
 
 
-# Calcolo di durata e consumo RAM medi durante analisi batch
-def compute_avg_time_and_ram(metrics: list[dict]) -> tuple[str, str]:
-    total_time = total_ram = 0.0    # somma cumulativa di valori
+# Calcolo durata e consumo RAM medi di analisi batch
+def compute_avg_time_and_ram(metrics: list[dict]):
+    total_time = total_ram = 0.0    # somme cumulative di durate e consumi RAM
     count_time = count_ram = 0      # numero di batch esaminati
 
     for m in metrics:
@@ -45,14 +58,11 @@ def compute_avg_time_and_ram(metrics: list[dict]) -> tuple[str, str]:
     avg_time = total_time / count_time if count_time else None
     avg_ram = total_ram / count_ram if count_ram else None
 
-    avg_time_str = f"{avg_time:.2f} sec" if avg_time is not None else "n/a" # NB: impotrante specificare "not None", altrimenti "if <val>" potrebbe essere falso anche in presenza di 0.0
-    avg_ram_str = f"{avg_ram:.2f} MB" if avg_ram is not None else "n/a"
-    
-    return avg_time_str, avg_ram_str
+    return avg_time, avg_ram
 
 
 # Ricerca durata e consumo RAM minimi
-def get_min_time_and_ram(metrics: list[dict]) -> tuple[str, str]:
+def get_min_time_and_ram(metrics: list[dict]):
     min_time = min_time_batch_id = None
     min_ram = min_ram_batch_id = None
 
@@ -69,15 +79,11 @@ def get_min_time_and_ram(metrics: list[dict]) -> tuple[str, str]:
                 min_ram = r
                 min_ram_batch_id = m.get("batch_id")
 
-    # NB: usare "is not None" per non escludere 0.0 come valore valido
-    min_time_str = f"{min_time:.2f} sec (batch {min_time_batch_id})" if min_time is not None else "n/a"
-    min_ram_str = f"{min_ram:.2f} MB (batch {min_ram_batch_id})" if min_ram is not None else "n/a"
-
-    return min_time_str, min_ram_str
+    return min_time, min_ram, min_time_batch_id, min_ram_batch_id
 
 
 # Ricerca durata e consumo RAM massimi
-def get_max_time_and_ram(metrics: list[dict]) -> tuple[str, str]:
+def get_max_time_and_ram(metrics: list[dict]):
     max_time = max_time_batch_id = None
     max_ram = max_ram_batch_id = None
 
@@ -93,8 +99,48 @@ def get_max_time_and_ram(metrics: list[dict]) -> tuple[str, str]:
             if max_ram is None or r > max_ram:
                 max_ram = r
                 max_ram_batch_id = m.get("batch_id")
-
-    max_time_str = f"{max_time:.2f} sec (batch {max_time_batch_id})" if max_time is not None else "n/a" # NB: impotrante specificare "not None", altrimenti "if <val>" potrebbe essere falso anche in presenza di 0.0
-    max_ram_str = f"{max_ram:.2f} MB (batch {max_ram_batch_id})" if max_ram is not None else "n/a"
     
-    return max_time_str, max_ram_str
+    return max_time, max_ram, max_time_batch_id, max_ram_batch_id
+
+
+# Calcolo throughout alert e batch
+def compute_throughput(metadata: dict, tot_time: float | None):
+    if tot_time is None:
+        return None
+
+    tot_alerts = metadata.get("num_rows")
+    tot_batches = metadata.get("num_batches")
+
+    alert_throughput = tot_alerts / tot_time if tot_alerts else None
+    batch_throughput = tot_batches / tot_time if tot_batches else None
+
+    return alert_throughput, batch_throughput
+
+
+# Calcolo deviazione standard di alert e batch
+def compute_standard_deviation(metrics: list[dict]):
+    if not metrics or len(metrics) < 2:
+        return None, None  # con meno di due batch, non ha senso calcolare la deviazione standard
+
+    try:
+        std_time = statistics.stdev(m["time_sec"] for m in metrics)
+        std_ram = statistics.stdev(m["ram_mb"] for m in metrics)
+        return std_time, std_ram
+    except (KeyError, statistics.StatisticsError):
+        return None, None
+
+
+# Calcolo di coefficiente di varianza di alert e batch
+def compute_cv(
+    std_time: float | None,
+    std_ram: float | None,
+    avg_time: float | None,
+    avg_ram: float | None
+):
+    cv_time = std_time / avg_time * 100 if std_time and avg_time else None
+    cv_ram = std_ram / avg_ram * 100 if std_ram and avg_ram else None
+    
+    cv_time_str = f"{cv_time:.1f}%" if cv_time is not None else "n/a"
+    cv_ram_str = f"{cv_ram:.1f}%" if cv_ram is not None else "n/a"
+
+    return cv_time, cv_ram

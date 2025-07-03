@@ -18,6 +18,7 @@ class ResourceManager:
         self._bucket = None
         self._max_concurrent_requests = 16
         self._max_cache_age = 60 * 60 * 24 * 7
+        self._not_available = "N/A"
         self._gcs_cache_dir = "cache"
         self._gcs_batch_metrics_dir = "batch_metrics"
         self._gcs_batch_result_dir = "batch_results"
@@ -42,6 +43,7 @@ class ResourceManager:
         # Variabili d'ambiente condivise su GCS
         self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
         self._max_cache_age = conf.get("max_cache_age", self._max_cache_age)
+        self._not_available = conf.get("not_available", self._not_available)
         self._gcs_cache_dir = conf.get("gcs_cache_dir", self._gcs_cache_dir)
         self._gcs_batch_metrics_dir = conf.get("gcs_batch_metrics_dir", self._gcs_batch_metrics_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
@@ -80,6 +82,10 @@ class ResourceManager:
     @property
     def max_cache_age(self):
         return self._max_cache_age
+
+    @property
+    def not_available(self):
+        return self._not_available
     
     @property
     def gcs_cache_dir(self):

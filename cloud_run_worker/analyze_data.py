@@ -59,7 +59,7 @@ def process_model_response(text: str, alert: dict, alert_id: int = 0) -> dict:
         parsed = json.loads(text)
         return {
             "id": alert_id,
-            "timestamp": alert.get("time", "n/a"),
+            "timestamp": alert.get("time", res.not_available),
             "class": parsed.get("class", "error"),
             "explanation": parsed.get("explanation", "Nessuna spiegazione")
         }
@@ -70,7 +70,7 @@ def process_model_response(text: str, alert: dict, alert_id: int = 0) -> dict:
 
         return {
             "id": alert_id,
-            "timestamp": alert.get("time", "n/a"),
+            "timestamp": alert.get("time", res.not_available),
             "class": "error",
             "explanation": f"Output non valido: {text}"
         }
@@ -87,7 +87,7 @@ def analyze_one_alert(alert: dict) -> dict:
     except Exception as e:
         return {
             "id": 0,
-            "timestamp": alert.get("time", "n/a"),
+            "timestamp": alert.get("time", res.not_available),
             "class": "error",
             "explanation": f"{type(e).__name__}: {str(e)}"
         }
@@ -107,7 +107,7 @@ async def analyze_batch_alert(i: int, alert: dict, semaphore) -> dict:
         except asyncio.TimeoutError:
             return {
                 "id": i,
-                "timestamp": alert.get("time", "n/a"),
+                "timestamp": alert.get("time", res.not_available),
                 "class": "error",
                 "explanation": "Timeout: il modello ha impiegato troppo tempo per rispondere"
             }
@@ -115,7 +115,7 @@ async def analyze_batch_alert(i: int, alert: dict, semaphore) -> dict:
         except Exception as e:
             return {
                 "id": i,
-                "timestamp": alert.get("time", "n/a"),
+                "timestamp": alert.get("time", res.not_available),
                 "class": "error",
                 "explanation": f"{type(e).__name__}: {str(e)}"
             }
@@ -124,7 +124,7 @@ async def analyze_batch_alert(i: int, alert: dict, semaphore) -> dict:
 # Analisi asincrona di batch
 async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, dataset_name: str) -> list[dict]:
     res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
-    start = prf.init_monitoring()
+    timer_start, timestamp_start = prf.init_monitoring()
 
     concurrency = min(len(batch_df), res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
     semaphore = asyncio.Semaphore(concurrency)
@@ -142,7 +142,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
         results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
         
         # Metriche
-        metrics = prf.finalize_monitoring(start, batch_id, len(batch_df))
+        metrics = prf.finalize_monitoring(timer_start, timestamp_start, batch_id, len(batch_df))
         metrics_path = f"{res.gcs_batch_metrics_dir}/{dataset_name}_metrics_{batch_id}.jsonl"
         await gcs.upload_as_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
         

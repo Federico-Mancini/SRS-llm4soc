@@ -3,6 +3,8 @@
   "max_concurrent_requests": 16,
   "max_cache_age": 604800,
 
+  "not_available": "N/A", 
+
   "asset_bucket_name": "main-asset-storage",
   "gcs_dataset_dir": "datasets",
   "gcs_cache_dir": "cache",

@@ -14,6 +14,7 @@ class ResourceManager:
         self._logger = logger
         self._bucket = None
         self._alerts_per_batch = 100
+        self._not_available = "N/A"
         self._gcs_dataset_dir = "input_datasets"
         self._gcs_metrics_dir = "metrics"
         self._gcs_result_dir = "results"
@@ -43,6 +44,7 @@ class ResourceManager:
 
         # Variabili d'ambiente condivise su GCS
         self._alerts_per_batch = conf.get("alerts_per_batch", self._alerts_per_batch)
+        self._not_available = conf.get("not_available", self._not_available)
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_metrics_dir = conf.get("gcs_metrics_dir", self._gcs_metrics_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
@@ -83,6 +85,10 @@ class ResourceManager:
     def alerts_per_batch(self):
         return self._alerts_per_batch
     
+    @property
+    def not_available(self):
+        return self._not_available
+
     @property
     def gcs_dataset_dir(self):
         return self._gcs_dataset_dir
