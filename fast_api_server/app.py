@@ -9,7 +9,7 @@ from utils.resource_manager import resource_manager as res
 from utils.cloud_utils import call_worker, enqueue_batch_analysis_tasks
 from utils.io_utils import read_local_json, download_to_local
 from utils.metadata_utils import create_metadata, get_metadata
-from utils.metrics_utils import compute_duration, compute_avg_time_and_ram
+from utils.metrics_utils import compute_duration, compute_avg_time_and_ram, get_min_time_and_ram, get_max_time_and_ram
 
 
 # --- API configuration ---------------------------------------------------------------------------
@@ -219,26 +219,31 @@ def get_metrics(dataset_filename: str = Query(...)):
         raise HTTPException(status_code=500, detail=msg)
 
 
-# Analisi metriche
+# Analisi metriche riguardante l'analisi dei batch
 @app.get("/analyze-metrics")
 def analyze_metrics(dataset_filename: str = Query(...)):
-    metadata_blob_path = gcs.get_blob_path(res.gcs_dataset_dir, dataset_filename, "metadata", "json")
     metrics_blob_path = gcs.get_blob_path(res.gcs_metrics_dir, dataset_filename, "metrics", "json")
+    metrics = None
 
     try:
-        metadata = gcs.read_json(metadata_blob_path)
         metrics = gcs.read_json(metrics_blob_path)
-
-        tot_time = compute_duration(metadata, metrics)
-        avg_time, avg_ram = compute_avg_time_and_ram(metrics)
-
-        return {
-            "dataset": dataset_filename,
-            "total_time_sec": tot_time,     # durata totale dell'analisi del dataset
-            "average_time_sec": avg_time,   # durata media dell'analisi di un batch
-            "average_ram_mb": avg_ram       # utilizzo di memoria RAM medio durante l'analisi di un batch
-        }
     except Exception as e:
-            msg = f"[VMS][app][analyze_metrics] -> Failed to read '{metrics_blob_path}' or '{metadata_blob_path}' ({type(e).__name__}): {str(e)}"
-            res.logger.error(msg)
-            raise HTTPException(status_code=500, detail=msg)
+        msg = f"[VMS][app][analyze_metrics] -> Failed to read '{metrics_blob_path}' ({type(e).__name__}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)        
+
+    tot_time = compute_duration(metrics)
+    avg_time, avg_ram = compute_avg_time_and_ram(metrics)
+    min_time, min_ram = get_min_time_and_ram(metrics)
+    max_time, max_ram = get_max_time_and_ram(metrics)
+    
+    return {
+        "dataset": dataset_filename,
+        "tot_time": tot_time,      # durata totale
+        "avg_time": avg_time,   # durata media
+        "min_time": min_time,       # durata minima registrata
+        "max_time": max_time,       # durata massima registrata
+        "avg_ram": avg_ram,     # consumo RAM medio
+        "min_ram": min_ram,         # consumo RAM minimo registrato
+        "max_ram": max_ram,         # consumo RAM massimo registrato
+    }

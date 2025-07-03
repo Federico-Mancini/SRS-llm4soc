@@ -135,7 +135,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
 
         # Parallelizzazione delle analisi sugli alert
         tasks = [
-            analyze_batch_alert(start_row + i, alert, semaphore)
+            analyze_batch_alert(start_row + i - 1, alert, semaphore)    # il -1 fa in modo che gli ID partano da 0
             for i, alert in enumerate(alerts, start=1)
         ]
 
