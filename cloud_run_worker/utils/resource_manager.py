@@ -58,6 +58,10 @@ class ResourceManager:
         self._initialized = True
         self._logger.info("[CRF][resource_manager][initialize] Initialization completed")
 
+    def reload_config(self):
+        conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
+        self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
+
 
     @property
     def logger(self):

@@ -13,25 +13,36 @@ class ResourceManager:
         self._initialized = False
         self._logger = logger
         self._bucket = None
+
         self._batch_size = 100
         self._max_concurrent_requests = 16
         self._not_available = "N/A"
+
         self._gcs_dataset_dir = "input_datasets"
         self._gcs_metrics_dir = "metrics"
         self._gcs_result_dir = "results"
         self._gcs_batch_metrics_dir = "batch_metrics"
         self._gcs_batch_result_dir = "batch_results"
+
         self._config_filename = "config.json"
         self._ml_dataset_filename = "training_reg_data.cvs"
+
         self._vms_config_path = "assets/config.json"
+        self._vms_config_backup_path = "assets/config_backup.json"
+        self._vms_benchmark_context_path = "assets/benchmark_context.json"
+        self._vms_benchmark_stop_flag = "assets/benchmark_stop.flag"
         self._vms_metrics_path = "assets/metrics.json"
         self._vms_result_path = "assets/result.json"
         self._vms_ml_dataset_path = "assets/training_reg_data.csv"
+
         self._project_id = ""
         self._location = ""
+
         self._batch_analysis_queue_name = "batch-analysis"
+
         self._runner_url = ""
         self._worker_url = ""
+
         self._vm_service_account_email = ""
         self.initialize()
 
@@ -49,34 +60,49 @@ class ResourceManager:
         self._batch_size = conf.get("batch_size", self._batch_size)
         self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
         self._not_available = conf.get("not_available", self._not_available)
+
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_metrics_dir = conf.get("gcs_metrics_dir", self._gcs_metrics_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_metrics_dir = conf.get("gcs_batch_metrics_dir", self._gcs_batch_metrics_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
+        
         self._config_filename = conf.get("config_filename", self._config_filename)
         self._ml_dataset_filename = conf.get("ml_dataset_filename", self._ml_dataset_filename)
+        
         self._vms_config_path = conf.get("vms_config_path", self._vms_config_path)
+        self._vms_config_backup_path = conf.get("vms_config_backup_path", self._vms_config_backup_path)
+        self._vms_benchmark_context_path = conf.get("vms_benchmark_context_path", self._vms_benchmark_context_path)
+        self._vms_benchmark_stop_flag = conf.get("vms_benchmark_stop_flag", self._vms_benchmark_stop_flag)
         self._vms_metrics_path = conf.get("vms_metrics_path", self._vms_metrics_path)
         self._vms_result_path = conf.get("vms_result_path", self._vms_result_path)
         self._vms_ml_dataset_path = conf.get("vms_ml_dataset_path", self._vms_ml_dataset_path)
+        
         self._project_id = conf.get("project_id", self._project_id)
         self._location = conf.get("location", self._location)
+        
         self._batch_analysis_queue_name = conf.get("batch_analysis_queue_name", self._batch_analysis_queue_name)
+        
         self._runner_url = conf.get("runner_url", self._runner_url)
         self._worker_url = conf.get("worker_url", self._worker_url)
+        
         self._vm_service_account_email = conf.get("vm_service_account_email", self._vm_service_account_email)
 
         self._initialized = True
-        self._logger.info("[VMS][resource_manager][initialize] Initialization completed")
+        self._logger.info("[VMS][resource_manager][initialize] -> Initialization completed")
 
     def get_config(self) -> dict:
         try:
             return json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
         except Exception:
-            self._logger.warning(f"[VMS][resource_manager][get_config] File {CONFIG_FILENAME} not found on GCS. Using local version as fallback")
+            self._logger.warning(f"[VMS][resource_manager][get_config] -> File {CONFIG_FILENAME} not found on GCS. Using local version as fallback")
             with open(os.path.join("assets", CONFIG_FILENAME), "r") as f:
                 return json.load(f)
+            
+    def reload_config(self):
+        conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
+        self._batch_size = conf.get("batch_size", self._batch_size)
+        self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
 
 
     @property
@@ -130,6 +156,18 @@ class ResourceManager:
     @property
     def vms_config_path(self):
         return self._vms_config_path
+
+    @property
+    def vms_config_backup_path(self):
+        return self._vms_config_backup_path
+
+    @property
+    def vms_benchmark_context_path(self):
+        return self._vms_benchmark_context_path
+    
+    @property
+    def vms_benchmark_stop_flag(self):
+        return self._vms_benchmark_stop_flag
 
     @property
     def vms_metrics_path(self):

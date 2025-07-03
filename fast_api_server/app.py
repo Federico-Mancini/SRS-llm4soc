@@ -4,15 +4,22 @@ import os ,json, posixpath
 import utils.gcs_utils as gcs
 import utils.metrics_utils as mtr
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query, BackgroundTasks
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from utils.resource_manager import resource_manager as res
+from utils.benchmark_utils import run_benchmark
 from utils.cloud_utils import call_worker, enqueue_batch_analysis_tasks
 from utils.io_utils import read_local_json, download_to_local
 from utils.metadata_utils import create_metadata, get_metadata
 
 
-# --- API configuration ---------------------------------------------------------------------------
+DEFAULT_BATCH_SIZE_SUP = 500
+DEFAULT_MAX_REQS_SUP = 16
+
+
+# == API configuration ============================================================================
+
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
@@ -40,14 +47,17 @@ async def startup_event():
     res.logger.info(f"[VMS][app][startup_event] -> File '{path}' uploaded to GCS as '/{res.config_filename}'")
 
 
-# --- Endpoints -----------------------------------------------------------------------------------
+
+# == Endpoints ====================================================================================
+# -- ANALISI SERVER -------------------------------------------------------------------------------
+
 @app.api_route("/", methods=["GET", "POST"])
 async def block_root():
     raise HTTPException(status_code=404, detail="Invalid endpoint")
 
 
 # Check di stato di server (VM) e worker (Cloud Run)
-@app.get("/check-status")
+@app.get("/server-status")
 async def check_status():
     try:
         data = await call_worker("GET", res.worker_url+ "/check-status")
@@ -61,8 +71,8 @@ async def check_status():
 
 
 # Check numero di file result temporanei creati fino al momento della chiamata
-@app.get("/monitor-batch-results")
-async def monitor_batch_results():
+@app.get("/batch-results-status")
+async def check_batch_results():
     try:
         blobs = res.bucket.list_blobs(prefix=res.gcs_batch_result_dir + "/")        
         count = 0
@@ -94,6 +104,9 @@ async def monitor_batch_results():
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
+
+
+# -- ANALISI ALERT --------------------------------------------------------------------------------
 
 # Analisi singolo alert
 @app.post("/chat")
@@ -203,6 +216,9 @@ def get_result(dataset_filename: str = Query(...)):
         raise HTTPException(status_code=500, detail=msg)
 
 
+
+# -- ANALISI METRICHE -----------------------------------------------------------------------------
+
 # Visualizzazione file con metriche
 @app.get("/metrics")
 def get_metrics(dataset_filename: str = Query(...)):
@@ -245,15 +261,23 @@ def analyze_metrics(dataset_filename: str = Query(...)):
 
     # Costruzione entry CSV
     csv_row = {
-        "num_rows": metadata.get("num_rows", 0),    # alert totali
-        "num_cols": metadata.get("num_columns", 0), # feature presenti in ogni alert
-        "batch_size": metadata.get("batch_size", 0),
+        # Parametri di input / configurazione
         "max_concurrent_reqs": res.max_concurrent_requests,
+        "batch_size": metadata.get("batch_size", 0),    # alert in ogni batch
+        "num_batches": metadata.get("num_batches", 0),
+        "num_rows": metadata.get("num_rows", 0),        # alert totali
+        "num_cols": metadata.get("num_columns", 0),     # feature presenti in ogni alert
+        
+        # Metriche di performance principali
         "tot_time": tot_time,
         "avg_time": avg_time,
         "avg_ram": avg_ram,
+
+        # Variabilità
         "std_time": std_time,
         "std_ram": std_ram,
+
+        # Efficienza
         "alert_throughput": a_throughput if a_throughput is not None else 0,
         "batch_throughput": b_throughput if b_throughput is not None else 0,
     }
@@ -272,22 +296,31 @@ def analyze_metrics(dataset_filename: str = Query(...)):
     f = mtr.format_metrics
 
     return {
+        # ID dataset
         "dataset": dataset_filename,
+
+        # Parametri di input / configurazione
         "alerts": metadata.get("num_rows", res.not_available),
         "batches": metadata.get("num_batches", res.not_available),
         "batch_size": metadata.get("batch_size", res.not_available),
         "max_concurrent_reqs": res.max_concurrent_requests,
+
+        # Metriche temporali
         "tot_time": f(tot_time, "sec"),                        # durata totale
         "avg_time": f(avg_time, "sec"),                        # durata media
         "std_time": f(std_time, "sec"),                        # deviazione standard durate
         "cv_time": f(cv_time, "%", 1),                         # coefficiente varianza durate
         "min_time": f(min_time, f"sec (batch {min_t_id})"),    # durata minima registrata
         "max_time": f(max_time, f"sec (batch {max_t_id})"),    # durata massima registrata
+        
+        # Metriche spaziali
         "avg_ram": f(avg_ram, "MB"),                           # consumo RAM medio
         "std_ram": f(std_ram, "MB"),                           # deviazione standard consumi RAM
         "cv_ram": f(cv_ram, "%", 1),                           # coefficiente varianza consumi RAM
         "min_ram": f(min_ram, f"MB (batch {min_r_id})"),       # consumo RAM minimo registrato
         "max_ram": f(max_ram, f"MB (batch {max_r_id})"),       # consumo RAM massimo registrato
+
+        # Metriche di efficienza
         "alert_throughput": f(a_throughput, "alert/sec"),      # alert elaborati al secondo
         "batch_throughput": f(b_throughput, "batch/sec"),      # batch elaborati al secondo    
     }
@@ -301,3 +334,62 @@ def analyze_metrics(dataset_filename: str = Query(...)):
     # Misura la variabilità relativa rispetto alla media: più la percentuale è bassa, più i dati sono coerenti (vicini alla media).
     # Percentuali maggiori del 15% sono indicative di dati poco coerenti.
     # Non ha unità di misura.
+
+
+
+# -- BENCHMARK ------------------------------------------------------------------------------------
+
+# Esecuzione automatizzata di analisi dataset con parametrizzazione variabile
+@app.get("/start-benchmark")
+def start_benchmark(
+    background_tasks: BackgroundTasks,
+    dataset_filename: str = Query(...),
+    batch_size_inf: int = Query(1),
+    batch_size_sup: int = Query(DEFAULT_BATCH_SIZE_SUP),
+    batch_size_step: int = Query(1),
+    max_reqs_inf: int = Query(1),
+    max_reqs_sup: int = Query(DEFAULT_MAX_REQS_SUP),
+    max_reqs_step: int = Query(1)
+):
+    if batch_size_sup > DEFAULT_BATCH_SIZE_SUP:
+        msg = f"[VMS][app][start_benchmark] 'sup_batch_size' cannot exceed {DEFAULT_BATCH_SIZE_SUP}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=400, detail=msg)
+    if max_reqs_sup > DEFAULT_MAX_REQS_SUP:
+        msg = f"[VMS][app][start_benchmark] 'sup_max_reqs' cannot exceed {DEFAULT_MAX_REQS_SUP}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=400, detail=msg)
+    
+
+    background_tasks.add_task(
+        run_benchmark,
+        dataset_filename,
+        batch_size_inf,
+        batch_size_sup,
+        batch_size_step,
+        max_reqs_inf,
+        max_reqs_sup,
+        max_reqs_step
+    )
+    return {"status": "Benchmark started in background"}
+
+
+# Terminazione benchmark in esecuzione
+@app.get("/stop-benchmark")
+def stop_benchmark():
+    with open(res.vms_benchmark_stop_flag, "w") as f:
+        f.write("stop")
+    return {"status": "Benchmark interruption signal sent"}
+
+
+# Monitoraggio stato del benchmark
+@app.get("/benchmark-status")
+def check_benchmark_status():
+    try:
+        with open(res.vms_benchmark_context_path, "r", encoding="utf-8") as f:
+            state = json.load(f)
+        return JSONResponse(content=state)
+    except Exception as e:
+        msg = f"[VMS][app][get_benchmark_status] Failed to read benchmark context: {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)

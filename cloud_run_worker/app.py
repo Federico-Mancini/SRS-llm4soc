@@ -27,6 +27,13 @@ async def check_status():
     return {"status": "running"}
 
 
+# Aggiornamento variabili d'ambiente modificato a runtime (ad esempio dal benchmark)
+@app.get("/reload-config")
+async def check_status():
+    res.reload_config()
+    return {"message": "Resource manager reloaded"}
+
+
 # Ricezione richieste d'analisi di un solo alert (da '/chat' di server)
 @app.post("/run-alert")
 async def run_alert(req: Request):

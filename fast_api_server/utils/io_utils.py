@@ -13,6 +13,18 @@ def read_local_json(local_path: str) -> list | dict:    # se nel file c'è un so
     return data
 
 
+# Upload file locale in GCS
+def upload_to_gcs(local_path: str, blob_path: str):
+    try:
+        blob = res.bucket.blob(blob_path)
+        blob.upload_from_filename(local_path)
+        res.logger.info(f"[VMS][gcs_utils][upload_to_gcs] Uploaded '{local_path}' to GCS as '{blob_path}'")
+    except Exception as e:
+        msg = f"[VMS][gcs_utils][upload_to_gcs] Failed to upload '{local_path}' to GCS ({type(e).__name__}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
+
+
 # Download file remoto in locale
 def download_to_local(blob_path: str, local_path: str):
     blob = res.bucket.blob(blob_path)

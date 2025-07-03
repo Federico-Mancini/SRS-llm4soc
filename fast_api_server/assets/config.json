@@ -18,6 +18,9 @@
   "ml_dataset_filename": "training_reg_data.csv",
 
   "vms_config_path": "assets/config.json",
+  "vms_config_backup_path": "assets/config_backup.json",
+  "vms_benchmark_context_path": "assets/benchmark_context.json",
+  "vms_benchmark_stop_flag": "assets/benchmark_stop.flag",
   "vms_metrics_path": "assets/metrics.json",
   "vms_result_path": "assets/result.json",
   "vms_ml_dataset_path": "assets/training_reg_data.csv",
