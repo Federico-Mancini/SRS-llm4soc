@@ -31,3 +31,4 @@ def download_to_local(blob_path: str, local_path: str):
         res.logger.error(msg)
         raise HTTPException(status_code=404, detail=msg)
     
+    res.logger.info(f"[VMS][io_utils][download_to_local] File '{blob_path}' downloaded to '{local_path}'")

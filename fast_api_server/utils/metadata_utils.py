@@ -32,7 +32,7 @@ def create_metadata(dataset_filename: str) -> dict:
 
     # Conteggio batch da generare
     num_rows = df.shape[0]
-    batch_size = res.alerts_per_batch
+    batch_size = res.batch_size
     n_batches = max(1, (num_rows + batch_size - 1) // batch_size)
 
     return {

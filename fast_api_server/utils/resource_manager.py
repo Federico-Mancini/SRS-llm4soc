@@ -13,7 +13,8 @@ class ResourceManager:
         self._initialized = False
         self._logger = logger
         self._bucket = None
-        self._alerts_per_batch = 100
+        self._batch_size = 100
+        self._max_concurrent_requests = 16
         self._not_available = "N/A"
         self._gcs_dataset_dir = "input_datasets"
         self._gcs_metrics_dir = "metrics"
@@ -21,9 +22,11 @@ class ResourceManager:
         self._gcs_batch_metrics_dir = "batch_metrics"
         self._gcs_batch_result_dir = "batch_results"
         self._config_filename = "config.json"
+        self._ml_dataset_filename = "training_reg_data.cvs"
         self._vms_config_path = "assets/config.json"
         self._vms_metrics_path = "assets/metrics.json"
         self._vms_result_path = "assets/result.json"
+        self._vms_ml_dataset_path = "assets/training_reg_data.csv"
         self._project_id = ""
         self._location = ""
         self._batch_analysis_queue_name = "batch-analysis"
@@ -43,7 +46,8 @@ class ResourceManager:
         conf = self.get_config()
 
         # Variabili d'ambiente condivise su GCS
-        self._alerts_per_batch = conf.get("alerts_per_batch", self._alerts_per_batch)
+        self._batch_size = conf.get("batch_size", self._batch_size)
+        self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
         self._not_available = conf.get("not_available", self._not_available)
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_metrics_dir = conf.get("gcs_metrics_dir", self._gcs_metrics_dir)
@@ -51,9 +55,11 @@ class ResourceManager:
         self._gcs_batch_metrics_dir = conf.get("gcs_batch_metrics_dir", self._gcs_batch_metrics_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
         self._config_filename = conf.get("config_filename", self._config_filename)
+        self._ml_dataset_filename = conf.get("ml_dataset_filename", self._ml_dataset_filename)
         self._vms_config_path = conf.get("vms_config_path", self._vms_config_path)
         self._vms_metrics_path = conf.get("vms_metrics_path", self._vms_metrics_path)
         self._vms_result_path = conf.get("vms_result_path", self._vms_result_path)
+        self._vms_ml_dataset_path = conf.get("vms_ml_dataset_path", self._vms_ml_dataset_path)
         self._project_id = conf.get("project_id", self._project_id)
         self._location = conf.get("location", self._location)
         self._batch_analysis_queue_name = conf.get("batch_analysis_queue_name", self._batch_analysis_queue_name)
@@ -82,8 +88,12 @@ class ResourceManager:
         return self._bucket
     
     @property
-    def alerts_per_batch(self):
-        return self._alerts_per_batch
+    def batch_size(self):
+        return self._batch_size
+    
+    @property
+    def max_concurrent_requests(self):
+        return self._max_concurrent_requests
     
     @property
     def not_available(self):
@@ -114,6 +124,10 @@ class ResourceManager:
         return self._config_filename
     
     @property
+    def ml_dataset_filename(self):
+        return self._ml_dataset_filename
+    
+    @property
     def vms_config_path(self):
         return self._vms_config_path
 
@@ -124,6 +138,10 @@ class ResourceManager:
     @property
     def vms_result_path(self):
         return self._vms_result_path
+    
+    @property
+    def vms_ml_dataset_path(self):
+        return self._vms_ml_dataset_path
     
     @property
     def project_id(self):

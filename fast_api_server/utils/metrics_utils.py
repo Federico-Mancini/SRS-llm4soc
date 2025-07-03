@@ -1,9 +1,15 @@
 import statistics
-from resource_manager import resource_manager as res
+from utils.resource_manager import resource_manager as res
 
 
 # Formattazione dati finali visualizzati nella risposta HTTP
-def format_metrics(value, suffix: str = "", precision: int = 2, fallback=res.not_available) -> str:
+def format_metrics(
+    value,
+    suffix: str = "",
+    precision: int = 2,
+    fallback=res.
+    not_available
+) -> str:
     try:
         if value is None or value == fallback:
             return fallback
@@ -106,7 +112,7 @@ def get_max_time_and_ram(metrics: list[dict]):
 # Calcolo throughout alert e batch
 def compute_throughput(metadata: dict, tot_time: float | None):
     if tot_time is None:
-        return None
+        return None, None
 
     tot_alerts = metadata.get("num_rows")
     tot_batches = metadata.get("num_batches")
@@ -119,8 +125,8 @@ def compute_throughput(metadata: dict, tot_time: float | None):
 
 # Calcolo deviazione standard di alert e batch
 def compute_standard_deviation(metrics: list[dict]):
-    if not metrics or len(metrics) < 2:
-        return None, None  # con meno di due batch, non ha senso calcolare la deviazione standard
+    if not metrics or len(metrics) < 2: # con meno di due batch, non ha senso calcolare la deviazione standard
+        return None, None
 
     try:
         std_time = statistics.stdev(m["time_sec"] for m in metrics)
@@ -140,7 +146,4 @@ def compute_cv(
     cv_time = std_time / avg_time * 100 if std_time and avg_time else None
     cv_ram = std_ram / avg_ram * 100 if std_ram and avg_ram else None
     
-    cv_time_str = f"{cv_time:.1f}%" if cv_time is not None else "n/a"
-    cv_ram_str = f"{cv_ram:.1f}%" if cv_ram is not None else "n/a"
-
     return cv_time, cv_ram

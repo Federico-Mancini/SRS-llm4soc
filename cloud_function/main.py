@@ -29,8 +29,8 @@ def merge_handler(event, context):
         if not res_blobs:
             return
 
-        # Estrazione metadati
         try:
+            # Lettura metadati
             dataset_name = os.path.basename(res_blobs[0].name).split("_result_")[0]     # es: "ABC_result_0.jsonl" -> "ABC"
             metadata = gcs.get_metadata(bucket, dataset_name)
         except IndexError:

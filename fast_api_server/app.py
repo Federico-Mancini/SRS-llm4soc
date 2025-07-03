@@ -81,12 +81,12 @@ async def monitor_batch_results():
         
         batches = metadata.get("num_batches") if metadata else -1
         status = "pending" if count == 0 else "partial" if count < batches else "completed"
-        completion_rate = f"{count}/{batches} batches analyzed" if batches > 0 else "n/a"
+        completion_rate = f"{count}/{batches} batches analyzed" if batches > 0 else res.not_available
 
         return {
             "status": status,
             "completion_rate": completion_rate,
-            "dataset_name": dataset_name or "n/a"
+            "dataset_name": dataset_name or res.not_available
         }
 
     except Exception as e:
@@ -243,6 +243,31 @@ def analyze_metrics(dataset_filename: str = Query(...)):
     std_time, std_ram = mtr.compute_standard_deviation(metrics)
     cv_time, cv_ram = mtr.compute_cv(std_time, std_ram, avg_time, avg_ram)
 
+    # Costruzione entry CSV
+    csv_row = {
+        "num_rows": metadata.get("num_rows", 0),    # alert totali
+        "num_cols": metadata.get("num_columns", 0), # feature presenti in ogni alert
+        "batch_size": metadata.get("batch_size", 0),
+        "max_concurrent_reqs": res.max_concurrent_requests,
+        "tot_time": tot_time,
+        "avg_time": avg_time,
+        "avg_ram": avg_ram,
+        "std_time": std_time,
+        "std_ram": std_ram,
+        "alert_throughput": a_throughput if a_throughput is not None else 0,
+        "batch_throughput": b_throughput if b_throughput is not None else 0,
+    }
+
+    try:
+        # Upload entry in append al dataset usato per l'addestramento del Linear Regressor (per fare tuning dei parametri in config.json)
+        if gcs.append_to_training_dataset(csv_row):
+            download_to_local(res.ml_dataset_filename, res.vms_ml_dataset_path)
+        #training_data = gcs.read_training_dataset()
+    except Exception as e:
+        msg = f"[CRW][app][analyze_metrics] -> Error ({type(e).__name__}): {str(e)}"
+        res.logger.error(msg)
+        return {"detail": msg}
+        
     # Alias locale
     f = mtr.format_metrics
 
@@ -251,6 +276,7 @@ def analyze_metrics(dataset_filename: str = Query(...)):
         "alerts": metadata.get("num_rows", res.not_available),
         "batches": metadata.get("num_batches", res.not_available),
         "batch_size": metadata.get("batch_size", res.not_available),
+        "max_concurrent_reqs": res.max_concurrent_requests,
         "tot_time": f(tot_time, "sec"),                        # durata totale
         "avg_time": f(avg_time, "sec"),                        # durata media
         "std_time": f(std_time, "sec"),                        # deviazione standard durate
@@ -265,11 +291,13 @@ def analyze_metrics(dataset_filename: str = Query(...)):
         "alert_throughput": f(a_throughput, "alert/sec"),      # alert elaborati al secondo
         "batch_throughput": f(b_throughput, "batch/sec"),      # batch elaborati al secondo    
     }
+
     # Deviazione Standard (std):
     # Misura la lontananza dei singoli valori dalla media.
     # Utile per valutare stabilità e prevedibilità di durate e consumi: con std bassa, la stabilità aumenta
     # Ha la stessa unità di misura dei dati analizzati (sec per le durate, MB per i consumi di RAM).
-    #
+
     # Coefficiente di variazione (cv):
     # Misura la variabilità relativa rispetto alla media: più la percentuale è bassa, più i dati sono coerenti (vicini alla media).
+    # Percentuali maggiori del 15% sono indicative di dati poco coerenti.
     # Non ha unità di misura.

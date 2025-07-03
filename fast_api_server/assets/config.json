@@ -1,5 +1,5 @@
 {
-  "alerts_per_batch": 100,
+  "batch_size": 100,
   "max_concurrent_requests": 16,
   "max_cache_age": 604800,
 
@@ -15,10 +15,12 @@
 
   "config_filename": "config.json",
   "result_filename": "result.json",
+  "ml_dataset_filename": "training_reg_data.csv",
 
   "vms_config_path": "assets/config.json",
   "vms_metrics_path": "assets/metrics.json",
   "vms_result_path": "assets/result.json",
+  "vms_ml_dataset_path": "assets/training_reg_data.csv",
 
   "project_id": "gruppo-4-456912",
   "location": "europe-west1",
