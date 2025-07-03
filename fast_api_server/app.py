@@ -90,13 +90,11 @@ async def check_batch_results():
         
         batches = metadata.get("num_batches")
         if not isinstance(batches, int) or batches <= 0:
-            msg = (
+            raise ValueError(
                 "Undefined 'num_batches' field in dataset metadata. "
                 "The dataset may never have been analyzed, or the metadata might have been deleted or altered. "
                 "Try analyzing the dataset or re-uploading it to regenerate the metadata file"
             )
-            res.logger.error(msg)
-            raise ValueError(msg)
 
         status = "pending" if count == 0 else "partial" if count < batches else "completed"
         completion_rate = f"{count}/{batches} batches analyzed" if batches > 0 else res.not_available

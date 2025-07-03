@@ -40,16 +40,18 @@ def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_size_s
         status="running"
     )
     
+    # TODO: far sì che, se il valore è strettamente maggiore al limite, venga eseguito un ultimo ciclo con il valore pari al limite stesso (vale per entrambi i loop)
     while curr_batch_size <= min(batch_size_sup, tot_alerts):
         curr_max_reqs = max_reqs_inf
         while curr_max_reqs <= max_reqs_sup:
             if check_stop_flag():
-                res.logger.info("[VMS][benchmark_utils][run_benchmark] Benchmark aborted")
+                res.logger.info("[VMS][benchmark_utils][run_benchmark] Benchmark execution interrupted by control flag")
                 return
 
             # Aggiornamento variabili d'ambiente su JSON
             update_config_json(curr_batch_size, curr_max_reqs)
             update_benchmark_context(
+                tot_alerts=tot_alerts,
                 batch_size=curr_batch_size,
                 max_reqs=curr_max_reqs,
                 last_request=f"/{DATASET_ANALYSIS}" # specificata qui per l'ampio transitorio che separa richiesta e risposta (potrebbe creare inconsistenza tra contesto e ciò che sta realmente accadendo)
@@ -61,22 +63,25 @@ def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_size_s
 
             # Polling su '/monitor-batch-results'
             update_benchmark_context(last_request=f"/{RESULTS_CHECK}", status="polling")
+            attempts = 0
             while True:
-                time.sleep(15)
                 response = requests.get(f"http://localhost:8000/{RESULTS_CHECK}")
                 if response.status_code != 200:
+                    if attempts < 3:    # NB: è possibile che la lettura fallisca in caso in cui avvenga nello stesso momento dell'aggiornamento del file dei metadati
+                        time.sleep(3)
+                        continue
                     restore_config()
                     msg = f"[VMS][benchmark_utils][run_benchmark] Polling failed: '/{RESULTS_CHECK}' returned status {response.status_code}"
                     res.logger.error(msg)
                     raise RuntimeError(msg)
                 if response.json().get("status") == "completed":
                     break
+                time.sleep(15)
 
             # Invio richiesta HTTP ad '/analyze-metrics'
             res.logger.info(f"[VMS][benchmark_utils][run_benchmark] Dataset analysis completed, now triggering '/{METRICS_ANALYSIS}'")
-            response = requests.get(f"http://localhost:8000/{METRICS_ANALYSIS}?dataset_filename={dataset_filename}")
+            requests.get(f"http://localhost:8000/{METRICS_ANALYSIS}?dataset_filename={dataset_filename}")
             update_benchmark_context(last_request=f"/{METRICS_ANALYSIS}", status="running")
-            print(response.text)
 
             curr_max_reqs += max_reqs_step
 
@@ -157,10 +162,17 @@ def update_benchmark_context(
     if dataset_filename is not None:
         context["dataset_filename"] = dataset_filename
 
+    if tot_alerts is not None:
+        context["tot_alerts"] = tot_alerts
+    else:
+        tot_alerts = context["tot_alerts"]  # in un modo o nell'altro, serve che tot_alerts sia sempre definito per poterlo usare nei successivi calcoli
+    
     if batch_size is not None or batch_size_sup is not None:
         current_val = context.get("batch_size", "0/0").split("/")
+        if tot_alerts is None:
+            tot_alerts = current_val[1]  # fallback: mantieni il limite superiore corrente
         new_val = batch_size if batch_size is not None else int(current_val[0])
-        new_val_sup = batch_size_sup if batch_size_sup is not None else min(int(current_val[1]), tot_alerts)
+        new_val_sup = batch_size_sup if batch_size_sup is not None else min(int(current_val[1]), int(tot_alerts))
         context["batch_size"] = f"{new_val}/{new_val_sup}"
 
     if batch_size_step is not None:
