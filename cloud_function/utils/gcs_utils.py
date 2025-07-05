@@ -1,4 +1,4 @@
-import json, posixpath
+import io, json, csv, posixpath
 
 from google.cloud import storage
 from utils.resource_manager import resource_manager as res
@@ -30,3 +30,39 @@ def upload_json(bucket: storage.Bucket, path: str, data_gen):
         json.dumps(data, indent=2),
         content_type="application/json"
     )
+
+
+# Append new data to the CSV and upload it
+def upload_csv_append(bucket: storage.Bucket, path: str, data_gen):
+    blob = bucket.blob(path)
+    data = list(data_gen)
+
+    if not data:
+        res.logger.info(f"[CRF][merge_utils][upload_csv_append] -> No data to append for '{path}'")
+        return
+
+    fieldnames = sorted(data[0].keys())
+
+    try:
+        existing_data = blob.download_as_text()
+        existing_io = io.StringIO(existing_data)
+        reader = csv.DictReader(existing_io)
+        existing_rows = list(reader)
+        header_exists = True
+    except Exception:
+        existing_rows = []
+        header_exists = False
+
+    output_io = io.StringIO()
+    writer = csv.DictWriter(output_io, fieldnames=fieldnames)
+
+    if not header_exists:
+        writer.writeheader()
+
+    for row in existing_rows:
+        writer.writerow(row)
+    for row in data:
+        writer.writerow(row)
+
+    blob.upload_from_string(output_io.getvalue(), content_type="text/csv")
+    res.logger.info(f"[CRF][gcs_utils][upload_csv_append] -> Appended {len(data)} rows to '{path}'")

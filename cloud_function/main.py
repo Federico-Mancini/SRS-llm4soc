@@ -51,8 +51,7 @@ def merge_handler(event, context):
         
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
-        #gcs_metrics_path = posixpath.join(res.gcs_metrics_dir, f"{dataset_name}_metrics_{timestamp}.json")  # il timestamp permette di mantenere anche i vecchi file
-        gcs_metrics_path = posixpath.join(res.gcs_metrics_dir, f"{dataset_name}_metrics.json")
+        gcs_metrics_path = posixpath.join(res.gcs_metrics_dir, f"{dataset_name}_metrics_{timestamp}.json")  # il timestamp permette di mantenere anche i vecchi file
 
         # Unificazione e upload file JSON (batch result file)
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch result files in '{gcs_result_path}'")
