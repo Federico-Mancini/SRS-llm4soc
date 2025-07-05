@@ -26,7 +26,9 @@ def merge_handler(event, context):
         res_blobs = list(bucket.list_blobs(prefix=results_prefix))
         met_blobs = list(bucket.list_blobs(prefix=metrics_prefix))
     
-        if not res_blobs:
+        if not res_blobs:           # assenza di file nella directory, 
+            return
+        if gcs.check_stop_flag(bucket):  # presenza del flag d'interruzione (utile quando ci sono già gli N file che ci si aspetta ma il merge è già stato eseguito)
             return
 
         try:
@@ -63,6 +65,8 @@ def merge_handler(event, context):
         metrics_data = list(gcs.stream_jsonl_blobs(met_blobs))
         gcs.upload_json(bucket, gcs_metrics_path, metrics_data)
         gcs.update_csv(bucket, gcs_metrics_csv_path, metrics_data)
+
+        gcs.set_stop_flag(bucket)
 
     except Exception as e:
         res.logger.error(f"[CRF][main][merge_handler] -> Error ({type(e).__name__}): {str(e)}")

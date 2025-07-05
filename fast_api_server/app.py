@@ -190,6 +190,7 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         # Pulizia e preparazione
         gcs.empty_dir(res.gcs_batch_metrics_dir)    # svuotamento directory dei batch metrics file
         gcs.empty_dir(res.gcs_batch_result_dir)     # svuotamento directory dei batch result file
+        gcs.remove_stop_flag()                      # riattivazione del merge handler
 
         # Lettura metadati del dataset
         metadata = download_metadata(dataset_filename)
@@ -371,6 +372,7 @@ def analyze_metrics(dataset_filename: str = Query(...)):
     # Non ha unità di misura.
 
 
+# Rimozione entry duplicate da CSV remoti contenenti metriche passate dei dataset
 @app.get("/remove-dups")
 def remove_dup_rows():
     gcs.remove_duplicate_rows()

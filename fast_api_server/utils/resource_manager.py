@@ -19,12 +19,14 @@ class ResourceManager:
         self._max_concurrent_requests = 16
         self._not_available = "N/A"
 
+        self._gcs_flag_dir = "control_flags"
         self._gcs_dataset_dir = "input_datasets"
         self._gcs_metrics_dir = "metrics"
         self._gcs_result_dir = "results"
         self._gcs_batch_metrics_dir = "batch_metrics"
         self._gcs_batch_result_dir = "batch_results"
 
+        self._merge_stop_flag_filename = "merge_stop.flag"
         self._config_filename = "config.json"
         self._ml_dataset_filename = "training_reg_data.cvs"
 
@@ -63,12 +65,14 @@ class ResourceManager:
         self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
         self._not_available = conf.get("not_available", self._not_available)
 
+        self._gcs_flag_dir = conf.get("gcs_flag_dir", self._gcs_flag_dir)
         self._gcs_dataset_dir = conf.get("gcs_dataset_dir", self._gcs_dataset_dir)
         self._gcs_metrics_dir = conf.get("gcs_metrics_dir", self._gcs_metrics_dir)
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_metrics_dir = conf.get("gcs_batch_metrics_dir", self._gcs_batch_metrics_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
         
+        self._merge_stop_flag_filename = conf.get("merge_stop_flag_filename", self._merge_stop_flag_filename)
         self._config_filename = conf.get("config_filename", self._config_filename)
         self._ml_dataset_filename = conf.get("ml_dataset_filename", self._ml_dataset_filename)
         
@@ -128,6 +132,10 @@ class ResourceManager:
     @property
     def not_available(self):
         return self._not_available
+    
+    @property
+    def gcs_flag_dir(self):
+        return self._gcs_flag_dir
 
     @property
     def gcs_dataset_dir(self):
@@ -208,6 +216,10 @@ class ResourceManager:
     @property
     def vm_service_account_email(self):
         return self._vm_service_account_email
+
+    @property
+    def merge_stop_flag_filename(self):
+        return self._merge_stop_flag_filename
 
 
 # Istanza singletone da far importare agli altri moduli
