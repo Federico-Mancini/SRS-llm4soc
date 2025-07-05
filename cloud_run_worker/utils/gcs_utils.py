@@ -10,7 +10,7 @@ def get_blob_path(folder: str, dataset_filename: str, suffix: str, file_format: 
     return posixpath.join(folder, f"{dataset_name}_{suffix}.{file_format}")
 
 
-# Caricamento del solo chunk d'interesse dal dataset su GCS (previene memory leaks in RAM)
+# F02 - Caricamento del solo chunk d'interesse dal dataset su GCS (previene memory leaks in RAM)
 def load_batch(path: str, start_row: int, end_row: int, chunksize: int) -> pd.DataFrame:
     stream = io.BytesIO(res.bucket.blob(path).download_as_bytes())
 
@@ -46,7 +46,7 @@ def load_batch(path: str, start_row: int, end_row: int, chunksize: int) -> pd.Da
     #   batch_df = df.iloc[start_row:end_row]
 
 
-# Upload asincrono di lista di oggetti JSON su GCS
+# F03 - Upload asincrono di lista di oggetti JSON su GCS
 async def upload_as_jsonl(path: str, data: list[dict]):
     await asyncio.to_thread(
         lambda: res.bucket.blob(path).upload_from_string(
@@ -55,6 +55,6 @@ async def upload_as_jsonl(path: str, data: list[dict]):
         )
     )
     # Nota:
-    # Questa funzione consente di non dover aspettare il termine dell'operazione di upload dati in caso venga ricevuta
+    # Questa funzione asincrona consente di non dover aspettare il termine dell'operazione di upload dati in caso venga ricevuta
     # una seconda richiesta di upload. In questo modo, le operazioni partono in parallelo invece che attendere la fine
     # di quella già in esecuzione.
