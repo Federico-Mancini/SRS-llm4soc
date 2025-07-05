@@ -42,6 +42,10 @@ def update_csv(bucket: storage.Bucket, path: str, data_gen):
         return
 
     fieldnames = sorted(data[0].keys())
+    output_io = io.StringIO()
+
+    header_exists = False
+    existing_rows = []
 
     try:
         existing_data = blob.download_as_text()
@@ -53,7 +57,6 @@ def update_csv(bucket: storage.Bucket, path: str, data_gen):
         existing_rows = []
         header_exists = False
 
-    output_io = io.StringIO()
     writer = csv.DictWriter(output_io, fieldnames=fieldnames)
 
     if not header_exists:
@@ -66,3 +69,31 @@ def update_csv(bucket: storage.Bucket, path: str, data_gen):
 
     blob.upload_from_string(output_io.getvalue(), content_type="text/csv")
     res.logger.info(f"[CRF][gcs_utils][upload_csv_append] -> Appended {len(data)} rows to '{path}'")
+
+
+
+    # try:
+    #     existing_data = blob.download_as_text()
+    #     if existing_data.strip():
+    #         existing_io = io.StringIO(existing_data)
+    #         reader = csv.DictReader(existing_io)
+    #         existing_rows = list(reader)
+    #         # Se esistono colonne valide, assumiamo che l'header esista
+    #         header_exists = reader.fieldnames is not None and len(reader.fieldnames) > 0
+    # except Exception as e:
+    #     res.logger.warning(f"[CRF][gcs_utils][update_csv] -> Skipping existing data (reason: {type(e).__name__}): {e}")
+
+    # # Scrittore CSV
+    # writer = csv.DictWriter(output_io, fieldnames=fieldnames)
+
+    # if not header_exists:
+    #     writer.writeheader()
+
+    # for row in existing_rows:
+    #     writer.writerow(row)
+    # for row in data:
+    #     writer.writerow(row)
+
+    # # Upload su GCS
+    # blob.upload_from_string(output_io.getvalue(), content_type="text/csv")
+    # res.logger.info(f"[CRF][gcs_utils][update_csv] -> Wrote {len(data)} new rows to '{path}'")
