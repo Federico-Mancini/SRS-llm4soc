@@ -109,7 +109,8 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
     res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
     timer_start, timestamp_start = prf.init_monitoring()
 
-    concurrency = min(len(batch_df), res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
+    batch_size = len(batch_df)
+    concurrency = min(batch_size, res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
     semaphore = asyncio.Semaphore(concurrency)
 
     try:
@@ -125,11 +126,11 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
         results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
         
         # Metriche
-        metrics = prf.finalize_monitoring(timer_start, timestamp_start, batch_id, len(batch_df))
-        metrics_path = f"{res.gcs_batch_metrics_dir}/{dataset_name}_metrics_{batch_id}.jsonl"
+        metrics = prf.finalize_monitoring(timer_start, timestamp_start, batch_id, batch_size)
+        metrics_path = gcs.get_blob_path(res.gcs_batch_metrics_dir, dataset_name, f"metrics_{batch_id}", "jsonl")
         await gcs.upload_as_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
         
-        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, RAM usage: {metrics['ram_mb']}MB, Time elapsed: {metrics['time_sec']}s")
+        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, time elapsed: {metrics['time_sec']}s")
 
         return results
 

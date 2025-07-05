@@ -2,6 +2,7 @@
 
 import asyncio, posixpath
 import utils.gcs_utils as gcs
+import utils.performance_utils as prf
 
 from fastapi import FastAPI, HTTPException, Request
 from concurrent.futures import ThreadPoolExecutor
@@ -60,8 +61,13 @@ async def run_batch(request: Request):
         #batch_result_list = await analyze_batch_cached(batch_df, batch_id, start_row, dataset_name) # TODO: testare efficacia cache su dataset più grandi
         
         # Salvataggio risultati su GCS
-        batch_results_path = posixpath.join(res.gcs_batch_result_dir, f"{dataset_name}_result_{batch_id}.jsonl")
+        batch_results_path = gcs.get_blob_path(res.gcs_batch_result_dir, dataset_name, f"result_{batch_id}", "jsonl")
         await gcs.upload_as_jsonl(batch_results_path, batch_results)    # 'batch_results' è una lista di oggetti JSON
+
+        # Calcolo numero errori di classificazione e aggiornamento metriche
+        batch_metrics_path = gcs.get_blob_path(res.gcs_batch_metrics_dir, dataset_name, f"metrics_{batch_id}", "jsonl")
+        updated_metrics = prf.compute_errors(batch_results, len(batch_df), batch_metrics_path)
+        await gcs.upload_as_jsonl(batch_metrics_path, updated_metrics)
 
         res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")
 

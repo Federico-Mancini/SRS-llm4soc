@@ -15,7 +15,7 @@ from utils.lock_utils import release_merge_lock
 from utils.metadata_utils import create_metadata, download_metadata, upload_metadata
 
 
-DEFAULT_BATCH_SIZE_SUP = 500
+DEFAULT_BATCH_SIZE_SUP = 250
 DEFAULT_MAX_REQS_SUP = 16
 
 
@@ -372,13 +372,6 @@ def analyze_metrics(dataset_filename: str = Query(...)):
     # Misura la variabilità relativa rispetto alla media: più la percentuale è bassa, più i dati sono coerenti (vicini alla media).
     # Percentuali maggiori del 15% sono indicative di dati poco coerenti.
     # Non ha unità di misura.
-
-
-# Rimozione entry duplicate da CSV remoti contenenti metriche passate dei dataset
-@app.get("/remove-dups")
-def remove_dup_rows():
-    gcs.remove_duplicate_rows()
-    return {"message": "Operation completed"}
 
 
 

@@ -1,4 +1,4 @@
-import os, time, psutil
+import os, time, json, psutil
 from utils.resource_manager import resource_manager as res
 
 
@@ -15,16 +15,46 @@ def init_monitoring() -> tuple[float, float]:
     # time.time():          timestamp assoluto (epoch time), usato per registrare istante d'inizio di analisi batch
 
 
-# Fine misurazione consumi
-def finalize_monitoring(timer_start: float, timestamp_start: float, batch_id: int, n_alerts: int) -> dict:
+# Finalizzazione misurazioni
+def finalize_monitoring(timer_start: float, timestamp_start: float, batch_id: int, batch_size: int) -> dict:
     elapsed = time.perf_counter() - timer_start
     ram = get_memory_usage_mb()
 
+    concurrency = res.max_concurrent_requests
+    parallelism_used = min(batch_size, concurrency)
+    avg_time = elapsed / batch_size if batch_size else 0.0
+    alert_throughput = batch_size / elapsed if elapsed else 0
+    
     return {
         "batch_id": batch_id,
-        "n_alerts": n_alerts,           # numero alert contenuti in un batch
-        "max_concurrent_reqs": res.max_concurrent_requests, # max numero di thread parallelizzabili con asyncio
-        "ram_mb": round(ram, 2),        # spazio d'archiviazione usato in RAM durante l'analisi (MB)
-        "time_sec": round(elapsed, 2),  # tempo impiegato per analizzare il batch (secondi)
-        "timestamp": timestamp_start    # timestamp istante inizio analisi del batch
+        "batch_size": batch_size,               # numero alert contenuti in un batch
+        "max_concurrent_reqs": concurrency,     # max numero di thread parallelizzabili con asyncio
+        "parallelism_used": parallelism_used,   # numero di richieste parallele effettivamente inviate a Gemini
+        "alert_throughput": alert_throughput,   # numero di alert processati al secondo
+        "ram_mb": ram,                          # spazio d'archiviazione usato in RAM durante l'analisi (MB)
+        "time_sec": elapsed,                    # tempo impiegato per analizzare il batch (secondi)
+        "avg_time_per_alert": avg_time,         # tempo d'elaborazione medio di ogni alert
+        "timestamp": timestamp_start            # timestamp istante inizio analisi del batch
     }
+
+
+# Calcolo errori in batch e aggiornamento metriche
+def compute_errors(batch_results: list[dict], batch_size: int, path: str) -> list[dict]:
+    n_errors = sum(1 for r in batch_results if r.get("class") == "error")
+    error_rate = n_errors / batch_size if batch_size else 0.0
+    success_rate = 1 - n_errors / batch_size if batch_size else 0.0
+    n_timeouts = sum("Timeout" in r.get("explanation", "") for r in batch_results)
+    
+    # Scarica metriche esistenti
+    metrics_text = res.bucket.blob(path).download_as_text()
+    metrics = json.loads(metrics_text)[0]  # metrics è una lista con un solo dizionario
+
+    # Aggiungi le nuove metriche
+    metrics["n_classified"] = batch_size - n_errors # classificazioni riuscite
+    metrics["success_rate"] = success_rate          # tasso di classificazione riuscite
+    metrics["has_errors"] = n_errors > 0            # flag utile per sapere immediatamente se ci sono errori nel batch
+    metrics["n_errors"] = n_errors                  # classificazioni fallite
+    metrics["error_rate"] = error_rate              # tasso di classificazione fallite
+    metrics["n_timeouts"] = n_timeouts              # numero di errori dovuti a timeout
+
+    return [metrics]
