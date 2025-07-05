@@ -203,13 +203,22 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
 
 # Analisi quesito utente per l'endpoint '/chat'
 def analyze_chat_question(prompt: str, alerts: list[dict] | dict):
+    print("OK1")
+    print(prompt)
+    print("OK2")
+    print(alerts)
+
     try:
+        print("OK3")
         alerts_str = alerts if isinstance(alerts, str) else json.dumps(alerts, indent=2, ensure_ascii=False)
+        print("OK4")
         full_prompt = (
             f"Domanda: {prompt}\n\n"
             f"Alert selezionati:\n{alerts_str}\n\n"
             "Fornisci una risposta testuale, tenendo conto sia della domanda che del contesto degli alert."
         )
+        print("OK5")
+        print(full_prompt)
 
         return res.model.generate_content(full_prompt, generation_config=res.gen_conf)
 
