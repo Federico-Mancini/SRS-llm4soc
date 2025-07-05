@@ -216,8 +216,9 @@ def analyze_chat_question(question: str, alerts: list[dict] | dict):
         print(full_prompt[:100])
 
         response = res.model.generate_content(full_prompt, generation_config=res.gen_conf)
-        print(response)
-        return response
+        print(response.text)
+        print(response.candidates.content.parts.text)
+        return response.text
 
     except Exception as e:
         res.logger.error(f"[data|F__]\t\t-> Failed to generate a response ({type(e).__name__}): {str(e)}")
