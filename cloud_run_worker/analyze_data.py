@@ -206,8 +206,8 @@ def analyze_chat_question(prompt: str, alerts: list[dict], dataset_filename: str
     blob_path = gcs.get_blob_path(res.gcs_result_dir, dataset_filename, "result", "json")
 
     try:
-        with open(blob_path, 'r') as f:
-            dataset_results = json.load(f)
+        data_text = res.bucket.blob(blob_path).download_as_text()
+        dataset_results = json.loads(data_text)
 
         full_prompt = (
             "Domanda: " + prompt + "\n\n"
