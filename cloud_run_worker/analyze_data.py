@@ -206,7 +206,7 @@ def analyze_chat_question(prompt: str, alerts: list[dict] | dict):
     try:
         full_prompt = (
             "Domanda: " + prompt + "\n\n"
-            "Alert selezionati:\n" + json.dumps(alerts, indent=2) + "\n\n"
+            "Alert selezionati:\n" + alerts + "\n\n"
             "Fornisci una risposta testuale, tenendo conto sia della domanda che del contesto degli alert."
         )
 

@@ -152,31 +152,3 @@ def read_training_dataset() -> list[dict]:
         msg = f"[gcs|F08]\t\t-> Failed to parse '{res.ml_dataset_filename}' to CSV ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
-
-
-# F09 - Conversione file metriche JSONL in CSV
-def convert_metrics_json_to_csv(gcs_json_path: str):
-    try:
-        blob = res.bucket.blob(gcs_json_path)
-        content = blob.download_as_text()
-        data = json.loads(content)
-
-        if not isinstance(data, list) or not data:
-            res.logger.warning(f"[gcs|F09]\t\t-> JSON non valido o vuoto in '{gcs_json_path}'")
-            return
-
-    except Exception as e:
-        res.logger.error(f"[gcs|F09]\t\t-> Errore lettura/parsing file '{gcs_json_path}': {type(e).__name__} - {str(e)}")
-        raise
-
-    dest_path = os.path.splitext(gcs_json_path)[0] + ".csv"
-
-    output = io.StringIO()
-    keys = data[0].keys()
-    writer = csv.DictWriter(output, fieldnames=keys)
-    writer.writeheader()
-    writer.writerows(data)
-
-    res.bucket.blob(dest_path).upload_from_string(output.getvalue(), content_type="text/csv")
-
-    res.logger.info(f"[gcs|F09]\t\t-> JSON '{gcs_json_path}' converted into CSV '{dest_path}'")

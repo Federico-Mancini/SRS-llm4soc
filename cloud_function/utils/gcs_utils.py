@@ -32,8 +32,8 @@ def upload_json(bucket: storage.Bucket, path: str, data_gen):
     )
 
 
-# Append new data to the CSV and upload it
-def upload_csv_append(bucket: storage.Bucket, path: str, data_gen):
+# Aggiorna il file CSV aggiungendo in append i nuovi dati
+def update_csv(bucket: storage.Bucket, path: str, data_gen):
     blob = bucket.blob(path)
     data = list(data_gen)
 

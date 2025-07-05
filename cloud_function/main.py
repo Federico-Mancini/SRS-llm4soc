@@ -49,9 +49,9 @@ def merge_handler(event, context):
             res.logger.info(f"[CRF][main][merge_handler] -> Found only {n_blobs}/{expected_batches} batch result files")
             return
         
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
-        gcs_metrics_path = posixpath.join(res.gcs_metrics_dir, f"{dataset_name}_metrics_{timestamp}.json")  # il timestamp permette di mantenere anche i vecchi file
+        gcs_metrics_path = posixpath.join(res.gcs_metrics_dir, f"{dataset_name}_metrics.json")
+        gcs_metrics_csv_path = posixpath.join(res.gcs_metrics_dir, f"{dataset_name}_metrics.csv")
 
         # Unificazione e upload file JSON (batch result file)
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch result files in '{gcs_result_path}'")
@@ -61,7 +61,8 @@ def merge_handler(event, context):
         # Unificazione e upload file CSV (batch metrics file)
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch metrics files in '{gcs_metrics_path}'")
         metrics_data = list(gcs.stream_jsonl_blobs(met_blobs))
-        gcs.upload_json(bucket, gcs_metrics_path, metrics_data)
+        gcs.upload_json(bucket, gcs_result_path, result_data)
+        gcs.update_csv(bucket, gcs_metrics_csv_path, metrics_data)
 
     except Exception as e:
         res.logger.error(f"[CRF][main][merge_handler] -> Error ({type(e).__name__}): {str(e)}")
