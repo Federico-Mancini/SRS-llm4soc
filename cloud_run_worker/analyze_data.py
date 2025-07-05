@@ -202,25 +202,22 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
 
 
 # Analisi quesito utente per l'endpoint '/chat'
-def analyze_chat_question(prompt: str, alerts: list[dict] | dict):
-    print("OK1")
-    print(prompt)
-    print("OK2")
-    print(alerts)
-
+def analyze_chat_question(question: str, alerts: list[dict] | dict):
     try:
-        print("OK3")
+        print("OK1")
         alerts_str = alerts if isinstance(alerts, str) else json.dumps(alerts, indent=2, ensure_ascii=False)
-        print("OK4")
+        print("OK2")
         full_prompt = (
-            f"Domanda: {prompt}\n\n"
+            f"Domanda: {question}\n\n"
             f"Alert selezionati:\n{alerts_str}\n\n"
             "Fornisci una risposta testuale, tenendo conto sia della domanda che del contesto degli alert."
         )
-        print("OK5")
-        print(full_prompt)
+        print("OK3")
+        print(full_prompt[:100])
 
-        return res.model.generate_content(full_prompt, generation_config=res.gen_conf)
+        response = res.model.generate_content(full_prompt, generation_config=res.gen_conf)
+        print(response)
+        return response
 
     except Exception as e:
         res.logger.error(f"[data|F__]\t\t-> Failed to generate a response ({type(e).__name__}): {str(e)}")
