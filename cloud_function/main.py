@@ -8,9 +8,6 @@ from utils.resource_manager import resource_manager as res
 from utils.lock_utils import acquire_lock
 
 
-LOCK_NAME = "merge_handler_lock"
-
-
 # F01 - Merge single result files in one final 'result.json' (eseguita come Cloud Function al trigger di GCS, cioè ogni volta che un file 'result' viene creato)
 def merge_handler(event, context):
     # Filtra solo eventi legati ai result batch (complemento al trigger con osservabilità limitata all'intero bucket)
@@ -28,7 +25,7 @@ def merge_handler(event, context):
         bucket = storage.Client().bucket(bucket_name)
 
         ### START - Sezione critica: acquisizione lock (creazione flag)
-        if not acquire_lock(bucket, LOCK_NAME):
+        if not acquire_lock(bucket):
             return
 
         # Estrazione file (risultati e metriche)
