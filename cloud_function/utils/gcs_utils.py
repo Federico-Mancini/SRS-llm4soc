@@ -36,38 +36,30 @@ def upload_json(bucket: storage.Bucket, path: str, data_gen):
 def update_csv(bucket: storage.Bucket, path: str, data_gen):
     blob = bucket.blob(path)
     data = list(data_gen)
-
+    
     if not data:
         res.logger.info(f"[CRF][merge_utils][upload_csv_append] -> No data to append for '{path}'")
         return
 
     fieldnames = sorted(data[0].keys())
-    header_exists = False
-    existing_rows = []
+    existing_rows, header_exists = [], False
 
-    # Analisi dati
     try:
-        existing_data = blob.download_as_text()
-        if existing_data.strip():
-            existing_io = io.StringIO(existing_data)
-            reader = csv.DictReader(existing_io)
+        if blob.exists():
+            reader = csv.DictReader(io.StringIO(blob.download_as_text()))
             existing_rows = list(reader)
-            header_exists = reader.fieldnames is not None and len(reader.fieldnames) > 0    # in presenza di colonne valide, si assume che l'header esista
+            header_exists = bool(reader.fieldnames)
+        else:
+            res.logger.info(f"[CRF][gcs_utils][update_csv] -> Blob '{path}' does not exist. Creating new file with header.")
     except Exception as e:
-        res.logger.warning(f"[CRF][gcs_utils][update_csv] -> Skipping existing data ({type(e).__name__}): {str(e)}")
+        res.logger.warning(f"[CRF][gcs_utils][update_csv] -> Failed to read existing data ({type(e).__name__}): {e}")
 
-    # Scrittura dati
     output_io = io.StringIO()
     writer = csv.DictWriter(output_io, fieldnames=fieldnames)
-
+    
     if not header_exists:
         writer.writeheader()
+    writer.writerows(existing_rows + data)
 
-    for row in existing_rows:
-        writer.writerow(row)
-    for row in data:
-        writer.writerow(row)
-
-    # Upload CSV
     blob.upload_from_string(output_io.getvalue(), content_type="text/csv")
     res.logger.info(f"[CRF][gcs_utils][upload_csv_append] -> Appended {len(data)} rows to '{path}'")

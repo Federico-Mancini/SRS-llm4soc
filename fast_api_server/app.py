@@ -235,7 +235,7 @@ def get_result(dataset_filename: str = Query(...)):
 
 # -- ANALISI METRICHE -----------------------------------------------------------------------------
 
-# E08 - Visualizzazione metriche dell'ultima analisi effettuata sul dataset specificato
+# E08 - Visualizzazione metriche dell'ultima analisi effettuata sul dataset specificato (metriche nel JSON, non CSV)
 @app.get("/metrics")
 def get_metrics(dataset_filename: str = Query(...)):
     blob_path = gcs.get_blob_path(res.gcs_metrics_dir, dataset_filename, "metrics", "json")
@@ -251,7 +251,7 @@ def get_metrics(dataset_filename: str = Query(...)):
         raise HTTPException(status_code=500, detail=msg)
 
 
-# E09 - Analisi metriche dell'ultima analisi effettuata sul dataset specificato
+# E09 - Analisi metriche dell'ultima analisi effettuata sul dataset specificato (metriche nel JSON, non CSV)
 @app.get("/analyze-metrics")
 def analyze_metrics(dataset_filename: str = Query(...)):
     metadata_blob_path = gcs.get_blob_path(res.gcs_dataset_dir, dataset_filename, "metadata", "json")
