@@ -39,7 +39,7 @@ def finalize_monitoring(timer_start: float, timestamp_start: float, batch_id: in
 
 
 # Calcolo errori in batch e aggiornamento metriche
-def compute_errors(batch_results: list[dict], batch_size: int, path: str) -> list[dict]:
+def update_metrics(batch_results: list[dict], batch_size: int, path: str) -> list[dict]:
     n_errors = sum(1 for r in batch_results if r.get("class") == "error")
     error_rate = n_errors / batch_size if batch_size else 0.0
     success_rate = 1 - n_errors / batch_size if batch_size else 0.0
@@ -58,3 +58,6 @@ def compute_errors(batch_results: list[dict], batch_size: int, path: str) -> lis
     metrics["n_timeouts"] = n_timeouts              # numero di errori dovuti a timeout
 
     return [metrics]
+
+# Elenco nomi metriche (per header CSV):
+# batch_id,batch_size,max_concurrent_reqs,parallelism_used,alert_throughput,ram_mb,time_sec,avg_time_per_alert,timestamp,n_classified,success_rate,has_errors,n_errors,error_rate,n_timeouts

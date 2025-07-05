@@ -1,8 +1,8 @@
 # CRW: Cloud Run Worker
 
-import asyncio, posixpath
+import asyncio
 import utils.gcs_utils as gcs
-import utils.performance_utils as prf
+import utils.metrics_utils as mtr
 
 from fastapi import FastAPI, HTTPException, Request
 from concurrent.futures import ThreadPoolExecutor
@@ -66,7 +66,8 @@ async def run_batch(request: Request):
 
         # Calcolo numero errori di classificazione e aggiornamento metriche
         batch_metrics_path = gcs.get_blob_path(res.gcs_batch_metrics_dir, dataset_name, f"metrics_{batch_id}", "jsonl")
-        updated_metrics = prf.compute_errors(batch_results, len(batch_df), batch_metrics_path)
+        updated_metrics = mtr.update_metrics(batch_results, len(batch_df), batch_metrics_path)
+        print(f"Updated metricss: {updated_metrics}")
         await gcs.upload_as_jsonl(batch_metrics_path, updated_metrics)
 
         res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")

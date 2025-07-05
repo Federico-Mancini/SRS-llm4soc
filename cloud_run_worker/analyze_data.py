@@ -1,7 +1,7 @@
 import json, time, asyncio
 import pandas as pd
 import utils.gcs_utils as gcs
-import utils.performance_utils as prf
+import utils.metrics_utils as mtr
 
 from utils.resource_manager import resource_manager as res
 from utils.cache_utils import alert_hash, cleanup_cache, download_cache, upload_cache
@@ -107,7 +107,7 @@ async def analyze_batch_alert(i: int, alert: dict, semaphore) -> dict:
 # Analisi asincrona di batch
 async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, dataset_name: str) -> list[dict]:
     res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
-    timer_start, timestamp_start = prf.init_monitoring()
+    timer_start, timestamp_start = mtr.init_monitoring()
 
     batch_size = len(batch_df)
     concurrency = min(batch_size, res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
@@ -126,7 +126,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
         results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
         
         # Metriche
-        metrics = prf.finalize_monitoring(timer_start, timestamp_start, batch_id, batch_size)
+        metrics = mtr.finalize_monitoring(timer_start, timestamp_start, batch_id, batch_size)
         metrics_path = gcs.get_blob_path(res.gcs_batch_metrics_dir, dataset_name, f"metrics_{batch_id}", "jsonl")
         await gcs.upload_as_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
         
@@ -141,7 +141,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
 # Analisi asincrona di batch con gestione cache
 async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row: int, dataset_name: str) -> list[dict]:
     res.logger.info(f"[CRW][analyze_data][analyze_batch_cached] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
-    start = prf.init_monitoring()
+    start = mtr.init_monitoring()
 
     concurrency = min(len(batch_df), res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
     semaphore = asyncio.Semaphore(concurrency)
@@ -188,7 +188,7 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
     
         results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
         # Metriche
-        metrics = prf.finalize_monitoring(start, batch_id, len(batch_df))
+        metrics = mtr.finalize_monitoring(start, batch_id, len(batch_df))
         metrics_path = f"{res.gcs_batch_metrics_dir}/{dataset_name}_batch_{batch_id}.jsonl"
         await gcs.upload_as_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
         
