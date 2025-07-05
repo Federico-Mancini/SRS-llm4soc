@@ -2,6 +2,7 @@
 
 import os ,json, posixpath
 import utils.gcs_utils as gcs
+import utils.io_utils as io
 import utils.metrics_utils as mtr
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query, BackgroundTasks
@@ -10,7 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from utils.resource_manager import resource_manager as res
 from utils.benchmark_utils import run_benchmark
 from utils.cloud_utils import call_worker, enqueue_batch_analysis_tasks
-from utils.io_utils import read_local_json, download_to_local
 from utils.metadata_utils import create_metadata, download_metadata, upload_metadata
 
 
@@ -29,14 +29,15 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
+# F01 - Function 1
 @app.on_event("startup")
 async def startup_event():
-    res.logger.info("[VMS][app][startup_event] -> Virtual Machine Server - Status: running")
+    res.logger.info("[app|F01]\t\t-> Virtual Machine Server - Status: running")
 
     # Controllo esistenza file di configurazione locale
     path = res.vms_config_path
     if not os.path.isfile(path):
-        msg = f"[VMS][app][startup_event] -> Config file '{path}' not found. Aborting startup"
+        msg = f"[app|F01]\t\t-> Config file '{path}' not found. Aborting startup"
         res.logger.error(msg)
         raise RuntimeError(msg)
     
@@ -44,32 +45,34 @@ async def startup_event():
     blob = res.bucket.blob(res.config_filename)
     blob.upload_from_filename(path)
 
-    res.logger.info(f"[VMS][app][startup_event] -> File '{path}' uploaded to GCS as '/{res.config_filename}'")
+    res.logger.info(f"[app|F01]\t\t-> File '{path}' uploaded to GCS as '/{res.config_filename}'")
 
 
 
 # == Endpoints ====================================================================================
 # -- ANALISI SERVER -------------------------------------------------------------------------------
 
+# E01 - Endpoint 1
 @app.api_route("/", methods=["GET", "POST"])
 async def block_root():
     raise HTTPException(status_code=404, detail="Invalid endpoint")
 
 
-# Check di stato di server (VM) e worker (Cloud Run)
+# E02 - Check di stato di server (VM) e worker (Cloud Run)
 @app.get("/health")
 async def health_check():
     try:
         data = await call_worker("GET", f"{res.worker_url}/check-status")
         msg = data.get("status", "unknown")
     except Exception as e:
-        msg = f"[VMS][app][health_check] -> {type(e).__name__}: {str(e)}"
+        msg = f"[app|E02]\t\t-> {type(e).__name__}: {str(e)}"
         res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
 
     return {"server (VMS)": "running", "worker (CRW)": msg}
 
 
-# Check numero di file result temporanei creati fino al momento della chiamata
+# E03 - Check numero di file result temporanei creati fino al momento della chiamata
 @app.get("/batch-results-status")
 async def check_batch_results():
     try:
@@ -88,12 +91,16 @@ async def check_batch_results():
                     dataset_name = os.path.basename(blob.name).split("_result_")[0]     # es: "ABC_result_0.jsonl" -> "ABC"
                     metadata = download_metadata(dataset_name) or {}
         
+        if not dataset_name or not metadata:
+            raise ValueError(f"[app|E03]\t\t-> Undefined 'dataset_name' field. This field will be available once the first batch result file has been loaded. Try again in a few seconds")
+        if not metadata:
+            raise FileNotFoundError(f"[app|E03]\t\t-> Metadata of '{dataset_name}' not found")
+
         batches = metadata.get("num_batches")
-        if not isinstance(batches, int) or batches <= 0:
+        if not isinstance(batches, int) or batches < 1:
             raise ValueError(
-                "Undefined 'num_batches' field in dataset metadata. "
-                "The dataset may never have been analyzed, or the metadata might have been deleted or altered. "
-                "Try analyzing the dataset or re-uploading it to regenerate the metadata file"
+                "The 'num_batches' field is undefined: the dataset may not have been analyzed yet, "
+                "still processing, or missing metadata. Try again later or re-upload the dataset to regenerate metadata"
             )
 
         status = "pending" if count == 0 else "partial" if count < batches else "completed"
@@ -106,7 +113,7 @@ async def check_batch_results():
         }
 
     except Exception as e:
-        msg = f"[VMS][app][check_batch_results] -> {type(e).__name__}: {str(e)}"
+        msg = f"[app|E03]\t\t-> {type(e).__name__}: {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
@@ -114,28 +121,26 @@ async def check_batch_results():
 
 # -- ANALISI ALERT --------------------------------------------------------------------------------
 
-# Analisi singolo alert
+# E04 - Analisi singolo alert
 @app.post("/chat")
 async def chat(request: Request):
     try:
         alert_json = await request.json()
-
         result = await call_worker(
             method="POST",
             url=f"{res.worker_url}/run-alert",
             json={"alert": alert_json}
         )
 
-        return {"explanation": result["explanation"] or "Undefined 'explanation' field"}
+        return {"explanation": result.get("explanation", "Undefined 'explanation' field")}
 
     except Exception as e:
-        msg = f"[VMS][app][chat] -> Failed to send request ({type(e).__name__}): {str(e)}"
+        msg = f"[app|E04]\t\t-> {type(e).__name__}: {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
 
-# Upload dataset (.jsonl o .csv) e relativi metadati su GCS
-# NB: se si cambia 'alerts_per_batch' sul 'config.json' locale alla VM, va fatta una richiesta ad '/upload-dataset' per aggiornare anche il corrispondente valore salvato come metadato del dataset su GCS
+# E05 - Upload dataset (.jsonl o .csv) e relativi metadati su GCS
 @app.post("/upload-dataset")
 async def upload_dataset(file: UploadFile = File(...)):
     # NB: se un file con lo stesso nome è già presente su GCS, viene sovrascritto
@@ -143,7 +148,7 @@ async def upload_dataset(file: UploadFile = File(...)):
 
     # Controllo estensione file ricevuto
     if not dataset_filename.endswith((".jsonl", ".csv")):
-        msg = f"[VMS][app][upload_dataset] -> Invalid file format: '{dataset_filename}' is not '.jsonl' or '.csv'"
+        msg = f"[app|E05]\t\t-> Invalid file format: '{dataset_filename}' is not '.jsonl' or '.csv'"
         res.logger.warning(msg)
         raise HTTPException(status_code=400, detail=msg)
     
@@ -153,7 +158,7 @@ async def upload_dataset(file: UploadFile = File(...)):
         dataset_path = posixpath.join(res.gcs_dataset_dir, dataset_filename)
         res.bucket.blob(dataset_path).upload_from_string(data, content_type=file.content_type)
 
-        res.logger.info(f"[VMS][app][upload_dataset] -> Dataset file '{dataset_filename}' uploaded to '{dataset_path}'")
+        res.logger.info(f"[app|E05]\t\t-> Dataset file '{dataset_filename}' uploaded to '{dataset_path}'")
 
         # Upload metadata dataset
         metadata = create_metadata(dataset_filename)
@@ -165,7 +170,7 @@ async def upload_dataset(file: UploadFile = File(...)):
             content_type="application/json"
         )
 
-        res.logger.info(f"[VMS][app][upload_dataset] -> Metadata file uploaded to '{metadata_path}'")
+        res.logger.info(f"[app|E05]\t\t-> Metadata uploaded to '{metadata_path}'")
 
         return {
             "status": "completed",
@@ -175,12 +180,12 @@ async def upload_dataset(file: UploadFile = File(...)):
         }
     
     except Exception as e:
-        msg = f"[VMS][app][upload_alerts] -> Failed to upload '{dataset_filename}' ({type(e).__name__}): {str(e)}"
+        msg = f"[app|E05]\t\t-> Failed to upload '{dataset_filename}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
 
-# Analisi dataset remoto (già caricato su GCS tramite '/upload-alerts')
+# E06 - Analisi dataset remoto (già caricato su GCS tramite '/upload-alerts')
 @app.get("/analyze-dataset")
 async def analyze_dataset(dataset_filename: str = Query(...)):
     try:
@@ -208,12 +213,12 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         }
     
     except Exception as e:
-        msg = f"[VMS][app][analyze_dataset] -> {type(e).__name__}: {str(e)}"
+        msg = f"[app|E06]\t\t-> {type(e).__name__}: {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
 
-# Visualizzazione file con alert classificati
+# E07 - Visualizzazione file con alert classificati
 @app.get("/result")
 def get_result(dataset_filename: str = Query(...)):
     blob_path = gcs.get_blob_path(res.gcs_result_dir, dataset_filename, "result", "json")
@@ -221,10 +226,10 @@ def get_result(dataset_filename: str = Query(...)):
 
     # Lettura dati
     try:
-        download_to_local(blob_path, local_path)
-        return read_local_json(local_path)
+        gcs.download_to(blob_path, local_path)
+        return io.read_json(local_path)
     except Exception as e:
-        msg = f"[VMS][app][get_result] -> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
+        msg = f"[app|E07]\t\t-> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
@@ -232,7 +237,7 @@ def get_result(dataset_filename: str = Query(...)):
 
 # -- ANALISI METRICHE -----------------------------------------------------------------------------
 
-# Visualizzazione file con metriche
+# E08 - Visualizzazione file con metriche
 @app.get("/metrics")
 def get_metrics(dataset_filename: str = Query(...)):
     blob_path = gcs.get_blob_path(res.gcs_metrics_dir, dataset_filename, "metrics", "json")
@@ -240,15 +245,15 @@ def get_metrics(dataset_filename: str = Query(...)):
 
     # Lettura dati
     try:
-        download_to_local(blob_path, local_path)
-        return read_local_json(local_path)
+        gcs.download_to(blob_path, local_path)
+        return io.read_json(local_path)
     except Exception as e:
-        msg = f"[VMS][app][get_metrics] -> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
+        msg = f"[app|E08]\t\t-> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
 
-# Analisi metriche riguardante l'analisi dei batch
+# E09 - Analisi metriche riguardante l'analisi dei batch
 @app.get("/analyze-metrics")
 def analyze_metrics(dataset_filename: str = Query(...)):
     metadata_blob_path = gcs.get_blob_path(res.gcs_dataset_dir, dataset_filename, "metadata", "json")
@@ -259,9 +264,9 @@ def analyze_metrics(dataset_filename: str = Query(...)):
         metadata = gcs.read_json(metadata_blob_path)
         metrics = gcs.read_json(metrics_blob_path)
     except Exception as e:
-        msg = f"[VMS][app][analyze_metrics] -> Failed to read '{metrics_blob_path}' ({type(e).__name__}): {str(e)}"
+        msg = f"[app|E09]\t\t-> Failed to read '{metrics_blob_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
-        raise HTTPException(status_code=500, detail=msg)        
+        raise HTTPException(status_code=500, detail=msg)
 
     # Calcolo metriche
     tot_time = mtr.compute_duration(metrics)
@@ -298,12 +303,12 @@ def analyze_metrics(dataset_filename: str = Query(...)):
     try:
         # Upload entry in append al dataset usato per l'addestramento del Linear Regressor (per fare tuning dei parametri in config.json)
         if gcs.append_to_training_dataset(csv_row):
-            download_to_local(res.ml_dataset_filename, res.vms_ml_dataset_path)
+            gcs.download_to(res.ml_dataset_filename, res.vms_ml_dataset_path)
         #training_data = gcs.read_training_dataset()
     except Exception as e:
-        msg = f"[CRW][app][analyze_metrics] -> Error ({type(e).__name__}): {str(e)}"
+        msg = f"[app|E09]\t\t-> {type(e).__name__}: {str(e)}"
         res.logger.error(msg)
-        return {"detail": msg}
+        raise HTTPException(status_code=500, detail=msg)
         
     # Alias locale
     f = mtr.format_metrics
@@ -352,7 +357,7 @@ def analyze_metrics(dataset_filename: str = Query(...)):
 
 # -- BENCHMARK ------------------------------------------------------------------------------------
 
-# Esecuzione automatizzata di analisi dataset con parametrizzazione variabile
+# E10 - Esecuzione automatizzata di analisi dataset con parametrizzazione variabile
 @app.get("/start-benchmark")
 def start_benchmark(
     background_tasks: BackgroundTasks,
@@ -365,11 +370,11 @@ def start_benchmark(
     max_reqs_step: int = Query(1)
 ):
     if batch_size_sup > DEFAULT_BATCH_SIZE_SUP:
-        msg = f"[VMS][app][start_benchmark] 'sup_batch_size' cannot exceed {DEFAULT_BATCH_SIZE_SUP}"
+        msg = f"[app|E10]\t\t-> 'sup_batch_size' cannot exceed {DEFAULT_BATCH_SIZE_SUP}"
         res.logger.error(msg)
         raise HTTPException(status_code=400, detail=msg)
     if max_reqs_sup > DEFAULT_MAX_REQS_SUP:
-        msg = f"[VMS][app][start_benchmark] 'sup_max_reqs' cannot exceed {DEFAULT_MAX_REQS_SUP}"
+        msg = f"[app|E10]\t\t-> 'sup_max_reqs' cannot exceed {DEFAULT_MAX_REQS_SUP}"
         res.logger.error(msg)
         raise HTTPException(status_code=400, detail=msg)
     
@@ -384,18 +389,18 @@ def start_benchmark(
         max_reqs_sup,
         max_reqs_step
     )
-    return {"status": "Benchmark started in background"}
+    return {"message": "Benchmark started in background. Keep an eye on the server log to spot eventual errors"}
 
 
-# Terminazione benchmark in esecuzione
+# E11 - Terminazione benchmark in esecuzione
 @app.get("/stop-benchmark")
 def stop_benchmark():
-    with open(res.vms_benchmark_stop_flag, "w") as f:
+    with open(res.vms_benchmark_stop_flag, "w") as f:   # creazione di un flag file per segnalare l'intenzione di terminare al benchmark
         f.write("stop")
     return {"status": "Benchmark interruption signal sent"}
 
 
-# Monitoraggio stato del benchmark
+# E12 - Monitoraggio stato del benchmark
 @app.get("/benchmark-status")
 def check_benchmark_status():
     try:
@@ -403,6 +408,6 @@ def check_benchmark_status():
             state = json.load(f)
         return JSONResponse(content=state)
     except Exception as e:
-        msg = f"[VMS][app][get_benchmark_status] Failed to read benchmark context: {str(e)}"
+        msg = f"[app|E10]\t\t-> Failed to read benchmark context: {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)

@@ -9,6 +9,7 @@ CONFIG_FILENAME = "config.json"
 
 
 class ResourceManager:
+    # F01 - Costruttore
     def __init__(self):
         self._initialized = False
         self._logger = logger
@@ -46,6 +47,7 @@ class ResourceManager:
         self._vm_service_account_email = ""
         self.initialize()
 
+    # F02 - Inizializzazione
     def initialize(self):
         if self._initialized:
             return
@@ -89,16 +91,18 @@ class ResourceManager:
         self._vm_service_account_email = conf.get("vm_service_account_email", self._vm_service_account_email)
 
         self._initialized = True
-        self._logger.info("[VMS][resource_manager][initialize] -> Initialization completed")
+        self._logger.info("[RM|F02]\t\t-> Resource manager initialized")
 
+    # F03 - Lettura file di configurazione
     def get_config(self) -> dict:
         try:
             return json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
         except Exception:
-            self._logger.warning(f"[VMS][resource_manager][get_config] -> File {CONFIG_FILENAME} not found on GCS. Using local version as fallback")
+            self._logger.warning(f"[RM|F03]\t\t-> File {CONFIG_FILENAME} not found on GCS. Using local version as fallback")
             with open(os.path.join("assets", CONFIG_FILENAME), "r") as f:
                 return json.load(f)
-            
+    
+    # F04 - Aggiornamento dei valori assegnati alle variabili private
     def reload_config(self):
         conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
         self._batch_size = conf.get("batch_size", self._batch_size)

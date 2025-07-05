@@ -38,7 +38,7 @@ class ResourceManager:
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
 
         self._initialized = True
-        self._logger.info("[CRF][resource_manager][initialize] -> Initialization completed")
+        self._logger.info("[RM|F02]\t-> Resource manager initialized")
 
 
     @property

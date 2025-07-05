@@ -1,32 +1,40 @@
+# Benchmark Utils: modulo dedicato alla gestione automatizzata dell'analisi di un dataset, eseguita con parametri dinamici
+
 import os, time, json, shutil, requests
 import utils.gcs_utils as gcs
+import utils.io_utils as io
 
 from fastapi import HTTPException
 from utils.resource_manager import resource_manager as res 
 from utils.cloud_utils import call_worker
-from utils.io_utils import upload_to_gcs
 
 
-# Endpoint usati nel benchmark
+MAX_POLLING_ATTEMPTS = 20
 DATASET_ANALYSIS = "analyze-dataset"
 METRICS_ANALYSIS = "analyze-metrics"
 RESULTS_CHECK = "batch-results-status"
 
 
-# Analisi automatizzata di un dataset, con parametrizzazione variabile 
+# F01 - Analisi automatizzata di un dataset, con parametrizzazione variabile
 def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_size_step, max_reqs_inf, max_reqs_sup, max_reqs_step):
+    # Eliminazione di eventuali flag residue
+    if os.path.exists(res.vms_benchmark_stop_flag):
+        os.remove(res.vms_benchmark_stop_flag)
+
     try:
+        # Lettura metadati
         metadata_blob_path = gcs.get_blob_path(res.gcs_dataset_dir, dataset_filename, "metadata", "json")
         metadata = gcs.read_json(metadata_blob_path)
         tot_alerts = metadata["num_rows"]   # non uso '.get()' per evidenziare eventuali problemi tramite il lancio di un'eccezione
     except Exception as e:
-        msg = f"[VMS][benchmark_utils][run_benchmark] -> Failed to load metadata: {str(e)}"
+        msg = f"[benchmark|F01]\t-> Failed to load metadata ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
     
     curr_batch_size = batch_size_inf
     curr_max_reqs = max_reqs_inf
     
+    # Salvataggio backup del file 'config.json' e aggiornamento di contesto del benchmark
     backup_config()
     update_benchmark_context(
         dataset_filename=dataset_filename,
@@ -40,12 +48,15 @@ def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_size_s
         status="running"
     )
     
-    # TODO: far sì che, se il valore è strettamente maggiore al limite, venga eseguito un ultimo ciclo con il valore pari al limite stesso (vale per entrambi i loop)
     while curr_batch_size <= min(batch_size_sup, tot_alerts):
-        curr_max_reqs = max_reqs_inf
+        curr_max_reqs = 4 if curr_batch_size > 100 else max_reqs_inf
+        # NB: all'aumentare della dimensione dei batch, il numero di thread paralleli viene resettato a un nuovo limite inferiore pari a 4.
+        #     Questo permette di velocizzare i tempi e di non considerare i casi estremi in cui viene elaborato un batch da centinaia
+        #     di alert sequenzialmente.
+        
         while curr_max_reqs <= max_reqs_sup:
             if check_stop_flag():
-                res.logger.info("[VMS][benchmark_utils][run_benchmark] Benchmark execution interrupted by control flag")
+                res.logger.info("[benchmark|F01]\t-> Benchmark execution interrupted by stop flag")
                 return
 
             # Aggiornamento variabili d'ambiente su JSON
@@ -58,60 +69,74 @@ def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_size_s
             )
 
             # Invio richiesta HTTP ad '/analyze-dataset'
-            res.logger.info(f"[VMS][benchmark_utils][run_benchmark] Now triggering '/{DATASET_ANALYSIS}'")
+            res.logger.info(f"[benchmark|F01]\t-> Sending request to '/{DATASET_ANALYSIS}'")
             requests.get(f"http://localhost:8000/{DATASET_ANALYSIS}?dataset_filename={dataset_filename}", timeout = 60)
 
             # Polling su '/monitor-batch-results'
             update_benchmark_context(last_request=f"/{RESULTS_CHECK}", status="polling")
             attempts = 0
             while True:
+                if check_stop_flag():
+                    res.logger.info("[benchmark|F01]\t-> Benchmark execution interrupted by stop flag")
+                    return
+                
                 response = requests.get(f"http://localhost:8000/{RESULTS_CHECK}")
-                if response.status_code != 200:
-                    if attempts < 3:    # NB: è possibile che la lettura fallisca in caso in cui avvenga nello stesso momento dell'aggiornamento del file dei metadati
-                        time.sleep(3)
-                        continue
-                    restore_config()
-                    msg = f"[VMS][benchmark_utils][run_benchmark] Polling failed: '/{RESULTS_CHECK}' returned status {response.status_code}"
-                    res.logger.error(msg)
-                    raise RuntimeError(msg)
+                
+                # Gestione errori (sia i 404 previsti che quelli di natura ignota)
+                if response.status_code != 200:             # NB: gli errori 404 previsti sono quelli che si verificano quando non è presente alcun file nella dir GCS '/batch_results' (risultati non ancora pronti)
+                    if attempts >= MAX_POLLING_ATTEMPTS:    # non viene usato un 'while(true)' per prevenire eventuali loop infiniti in presenza di errori ignoti
+                        update_benchmark_context(status="error")
+                        restore_config()
+                        res.logger.error(f"[benchmark|F01]\t-> Polling failed: '/{RESULTS_CHECK}' returned status {response.status_code}")
+                        return
+                    
+                    res.logger.warning(f"[benchmark|F01]\t-> Attempt {attempts + 1}/{MAX_POLLING_ATTEMPTS}")
+                    polling_period = 5 + attempts^2
+                    time.sleep(polling_period if polling_period < 60 else 60)   # attesa esponenziale, con limite superiore fissato a 60
+                    attempts += 1
+                    continue
+                
                 if response.json().get("status") == "completed":
                     break
-                time.sleep(15)
+                
+                res.logger.info("[benchmark|F01]\t-> Waiting to get all the batch result files")
+                time.sleep(15 if tot_alerts < 500 else 30)
 
             # Invio richiesta HTTP ad '/analyze-metrics'
-            res.logger.info(f"[VMS][benchmark_utils][run_benchmark] Dataset analysis completed, now triggering '/{METRICS_ANALYSIS}'")
+            res.logger.info(f"[benchmark|F01]\t-> Dataset analysis completed, now sending request to '/{METRICS_ANALYSIS}'")
             requests.get(f"http://localhost:8000/{METRICS_ANALYSIS}?dataset_filename={dataset_filename}")
             update_benchmark_context(last_request=f"/{METRICS_ANALYSIS}", status="running")
 
-            curr_max_reqs += max_reqs_step
+            curr_max_reqs = get_next_val(curr=curr_max_reqs, sup=max_reqs_sup, step=max_reqs_step)
+            if curr_batch_size != batch_size_sup or curr_max_reqs != max_reqs_sup:  # se è l'ultima iterazione, non attendo 1 minuto
+                time.sleep(60)  # apparentemente man mano che si inviano richieste senza sosta, i tempi d'elaborazione si allungano. Una breve pausa intermedia aiuta a tornare in margini accettabili
 
-        curr_batch_size += batch_size_step
+        curr_batch_size = get_next_val(curr=curr_batch_size, sup=batch_size_sup, step=batch_size_step)
 
     restore_config()
     update_benchmark_context(status="completed")
-    res.logger.info("[VMS][benchmark_utils][run_benchmark] Benchmark completed")
+    res.logger.info("[benchmark|F01]\t-> Benchmark naturally completed")
 
 
-# Salvataggio di variabili d'ambiente originali in un file copia temporaneo
+# F02 - Salvataggio di variabili d'ambiente originali in un file copia temporaneo
 def backup_config():
     if not os.path.exists(res.vms_config_backup_path):
         shutil.copy(res.vms_config_path, res.vms_config_backup_path)
-        res.logger.info("[VMS][benchmark_utils][backup_config] Backup of 'config.json' created")
+        res.logger.info(f"[benchmark|F02]\t-> Backup of '{res.config_filename}' created")
     else:
-        res.logger.warning("[VMS][benchmark_utils][backup_config] Backup already exists")
+        res.logger.warning("[benchmark|F02]\t-> Backup already exists")
 
-
-# Ripristino delle variabili d'ambiente originali
+# F03 - Ripristino delle variabili d'ambiente originali
 def restore_config():
     if os.path.exists(res.vms_config_backup_path):
         shutil.copy(res.vms_config_backup_path, res.vms_config_path)
         os.remove(res.vms_config_backup_path)
-        res.logger.info("[VMS][benchmark_utils][restore_config] Original 'config.json' restored and backup deleted")
+        res.logger.info(f"[benchmark|F03]\t-> Original '{res.config_filename}' restored and backup deleted")
     else:
-        res.logger.warning("[VMS][benchmark_utils][restore_config] No backup found to restore")
+        res.logger.warning("[benchmark|F03]\t-> No backup found to restore")
 
 
-# Aggiornamento variabili d'ambiente in 'config.json'
+# F04 - Aggiornamento variabili d'ambiente in 'config.json'
 def update_config_json(batch_size, max_reqs):
     local_path = res.vms_config_path
     blob_path = res.config_filename
@@ -123,24 +148,22 @@ def update_config_json(batch_size, max_reqs):
     config["batch_size"] = batch_size
     config["max_concurrent_requests"] = max_reqs
 
-    # Scrittura locale e remota
-    with open(local_path, "w", encoding="utf-8") as f:
-        json.dump(config, f, indent=2)
-    upload_to_gcs(local_path, blob_path)
+    # Aggiornamento 'config.json' locale e remoto
+    io.write_json(config, local_path)           # scrittura file locale
+    gcs.upload_to(local_path, blob_path)    # scirttura file remoto
 
     try:
         # Aggiornamento dati salvati in resource manager locale (VMS) e remoto (CRW)
         res.reload_config()
         call_worker("GET", f"{res.worker_url}/reload-config")
     except Exception as e:
-        msg = f"[VMS][app][check_status] -> Error ({type(e).__name__}): {str(e)}"
+        msg = f"[benchmark|F04]\t-> Error ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
-    res.logger.info(f"[VMS][benchmark_utils][update_config_json] Updated 'config.json' (batch_size: {batch_size}, max_concurrent_reqs: {max_reqs})")
+    res.logger.info(f"[benchmark|F04]\t-> File '{res.config_filename}' updated (batch_size: {batch_size}, max_concurrent_reqs: {max_reqs})")
 
-
-# Salvataggio contesto del benchmark
+# F05 - Salvataggio contesto del benchmark
 def update_benchmark_context(
     dataset_filename=None,
     tot_alerts=None,
@@ -199,14 +222,41 @@ def update_benchmark_context(
         json.dump(context, f, indent=2)
 
 
-# Check flag terminazione
+# F06 - Controllo del flag di terminazione
 def check_stop_flag() -> bool:
     if not os.path.exists(res.vms_benchmark_stop_flag):
         return False
     
-    res.logger.warning("[VMS][benchmark_utils][check_stop_flag] Stop flag detected — benchmark aborted")
+    res.logger.warning("[benchmark|F06]\t-> Stop flag detected, benchmark aborted")
     os.remove(res.vms_benchmark_stop_flag)
     restore_config()
     update_benchmark_context(status="aborted")
     return True
 
+
+# F07 - Incremento condizionato delle variabili di controllo
+def get_next_val(curr: int, sup: int, step: int) -> int:
+    # Troncatura del valore al limite superiore, in caso lo superi
+    def cut(val: int) -> int:
+        return val if val < sup else sup    # restituisce il valore o il limite superiore quando superato
+    
+    # Ricerca del primo sottomultiplo del limite superiore
+    def get_first_submultiple() -> int | None:
+        for i in range(curr+1, sup+1):  # il range ha inizio in 'curr+1': valori minori o uguali a 'curr' non interessano
+            if i % step == 0:           # 'i != sup' non è presente in quanto questo caso è già intercettato nell'IF esterno: 'curr == sup'
+                return i if i - curr > step / 2 else cut(i + step)  # se 'curr' è molto vicino a 'i', si preferisce assegnargli il multiplo successivo a quello prossimo 
+        return None
+
+
+    if curr == sup:                     # termine del ciclo che ha visto il 'curr_val' finale, uguale al limite superiore
+        return curr + 1                 # valore flag usato per uscire dal ciclo while
+
+    next_val = cut(curr + step)         # incremento con troncatura (in caso il nuovo valore superi il limite superiore)
+
+    if next_val == sup or step == 1:    # limite raggiunto (restituzione immediata), incremento +1 (nessuna modifica richiesta)
+        return next_val
+    
+    if sup % step == 0:                 # limite superiore multiplo del passo (se True, 'curr' viene allineato alla sequenza di sottomultipli)
+        return get_first_submultiple() or next_val
+
+    return next_val

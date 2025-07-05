@@ -1,3 +1,5 @@
+# Cloud Utils: modulo per la gestione delle comunicazioni server-worker (VSM-CRW)
+
 import json, httpx
 
 from google.cloud import tasks_v2
@@ -5,7 +7,7 @@ from utils.resource_manager import resource_manager as res
 from utils.auth_utils import get_auth_header
 
 
-# Gestore chiamate al runner su Cloud Run
+# F01 - Gestore chiamate al worker in esecuzione su Cloud Run
 async def call_worker(method: str, url: str, json: dict = None, timeout: float = 30.0) -> dict:
     headers = get_auth_header(url)
 
@@ -16,26 +18,25 @@ async def call_worker(method: str, url: str, json: dict = None, timeout: float =
             elif method.upper() == "POST":
                 response = await client.post(url, headers=headers, json=json)
             else:
-                raise ValueError("Metodo HTTP non supportato")
+                raise ValueError("[cloud|F01]\t\t-> Metodo HTTP non supportato")
             
-            res.logger.info(f"[VMS][auth_utils][call_worker] -> {response.text}")
             response.raise_for_status()
             return response.json()
 
     except httpx.RequestError as e:
-        res.logger.error(f"[VMS][auth_utils][call_worker] -> Connection error ({type(e).__name__}): {str(e)}")
+        res.logger.error(f"[cloud|F01]\t\t-> Connection error ({type(e).__name__}): {str(e)}")
         raise
 
     except httpx.HTTPStatusError as e:
-        res.logger.error(f"[VMS][auth_utils][call_worker] -> Invalid HTTP response ({type(e).__name__}): {str(e)}")
+        res.logger.error(f"[cloud|F01]\t\t-> Invalid HTTP response ({type(e).__name__}): {str(e)}")
         raise
 
     except Exception as e:
-        res.logger.error(f"[VMS][auth_utils][call_worker] -> Error ({type(e).__name__}): {str(e)}")
+        res.logger.error(f"[cloud|F01]\t\t-> {type(e).__name__}: {str(e)}")
         raise
 
 
-# Invio richieste multiple per l'analisi degli alert che compongono il batch
+# F02 - Invio richieste multiple per l'analisi degli alert che compongono il batch
 def enqueue_batch_analysis_tasks(metadata: json):
     client = tasks_v2.CloudTasksClient()
     parent = client.queue_path(res.project_id, res.location, res.batch_analysis_queue_name)
@@ -74,7 +75,6 @@ def enqueue_batch_analysis_tasks(metadata: json):
             }
         }
 
-        response = client.create_task(parent=parent, task=task)
-        res.logger.debug(f"[VMS][task_utils][enqueue_tasks] -> Created task for batch {i}: {response.name}")
-    
-    res.logger.info(f"[VMS][task_utils][enqueue_tasks] -> {num_batches} tasks created")
+        client.create_task(parent=parent, task=task)
+
+    res.logger.info(f"[cloud|F02]\t\t-> {num_batches} tasks created")

@@ -56,8 +56,8 @@ class ResourceManager:
             self._logger.warning(f"[CRW][resource_manager][initialize] Warm-up failed ({type(e).__name__}): {str(e)}")
 
         self._initialized = True
-        self._logger.info("[CRF][resource_manager][initialize] Initialization completed")
-
+        self._logger.info("[RM|F02]\t-> Resource manager initialized")
+        
     def reload_config(self):
         conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
         self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
