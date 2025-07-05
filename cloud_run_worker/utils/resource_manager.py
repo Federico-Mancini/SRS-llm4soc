@@ -20,6 +20,7 @@ class ResourceManager:
         self._max_cache_age = 60 * 60 * 24 * 7
         self._not_available = "N/A"
         self._gcs_cache_dir = "cache"
+        self._gcs_result_dir = "results"
         self._gcs_batch_metrics_dir = "batch_metrics"
         self._gcs_batch_result_dir = "batch_results"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
@@ -45,6 +46,7 @@ class ResourceManager:
         self._max_cache_age = conf.get("max_cache_age", self._max_cache_age)
         self._not_available = conf.get("not_available", self._not_available)
         self._gcs_cache_dir = conf.get("gcs_cache_dir", self._gcs_cache_dir)
+        self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_metrics_dir = conf.get("gcs_batch_metrics_dir", self._gcs_batch_metrics_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
 
@@ -94,7 +96,11 @@ class ResourceManager:
     @property
     def gcs_cache_dir(self):
         return self._gcs_cache_dir
-    
+
+    @property
+    def gcs_result_dir(self):
+        return self._gcs_result_dir
+        
     @property
     def gcs_batch_metrics_dir(self):
         return self._gcs_batch_metrics_dir

@@ -6,7 +6,7 @@ import utils.gcs_utils as gcs
 from fastapi import FastAPI, HTTPException, Request
 from concurrent.futures import ThreadPoolExecutor
 from utils.resource_manager import resource_manager as res
-from analyze_data import analyze_one_alert, analyze_batch, analyze_batch_cached
+from analyze_data import analyze_chat_question, analyze_batch, analyze_batch_cached
 
 
 app = FastAPI()
@@ -34,25 +34,10 @@ async def check_status():
     return {"message": "Resource manager reloaded"}
 
 
-# Ricezione richieste d'analisi di un solo alert (da '/chat' di server)
-@app.post("/run-alert")
-async def run_alert(req: Request):
-    data = await req.json()
-    alert = data["alert"]
-
-    if not alert:
-        msg = f"[CRR][runner][run_alert] -> Missing 'alert' field from request body"
-        res.logger.error(msg)
-        raise HTTPException(status_code=400, detail=msg)
-
-    return analyze_one_alert(alert)
-
-
 # Ricezione richieste d'analisi del batch i-esimo
 # Operazioni: estrazione batch dal dataset remoto -> classificazione alert -> creazione file result temporaneo
 @app.post("/run-batch")
 async def run_batch(request: Request):
-
     try:
         body = await request.json()
 
@@ -90,3 +75,21 @@ async def run_batch(request: Request):
         msg = f"[CRW][app][run_batch] -> Error ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         return {"detail": msg}
+    
+
+# Ricezione richieste d'analisi di un solo alert (da '/chat' di server)
+@app.post("/run-chatbot")
+async def run_alert(req: Request):
+    data = await req.json()
+    dataset_filename = data["dataset_filename"]
+    question = data["question"]
+    alerts = data["alert"]
+
+    if not dataset_filename and not question or not alerts:
+        msg = f"[CRR][runner][run_alert] -> Missing fields from request body"
+        res.logger.error(msg)
+        raise HTTPException(status_code=400, detail=msg)
+
+    return {
+        "explanation": analyze_chat_question(question, alerts, dataset_filename)
+    }

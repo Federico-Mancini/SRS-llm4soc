@@ -125,14 +125,12 @@ async def check_batch_results():
 @app.post("/chat")
 async def chat(request: Request):
     try:
-        alert_json = await request.json()
-        result = await call_worker(
+        data = await request.json() # question, data
+        return await call_worker(
             method="POST",
-            url=f"{res.worker_url}/run-alert",
-            json={"alert": alert_json}
+            url=f"{res.worker_url}/run-chatbot",
+            json=data
         )
-
-        return {"explanation": result.get("explanation", "Undefined 'explanation' field")}
 
     except Exception as e:
         msg = f"[app|E04]\t\t-> {type(e).__name__}: {str(e)}"
@@ -224,8 +222,8 @@ def get_result(dataset_filename: str = Query(...)):
     blob_path = gcs.get_blob_path(res.gcs_result_dir, dataset_filename, "result", "json")
     local_path = res.vms_result_path
 
-    # Lettura dati
     try:
+        # Lettura dati
         gcs.download_to(blob_path, local_path)
         return io.read_json(local_path)
     except Exception as e:
@@ -243,8 +241,9 @@ def get_metrics(dataset_filename: str = Query(...)):
     blob_path = gcs.get_blob_path(res.gcs_metrics_dir, dataset_filename, "metrics", "json")
     local_path = res.vms_metrics_path
 
-    # Lettura dati
     try:
+        # Lettura dati
+        #gcs.convert_metrics_json_to_csv(blob_path)
         gcs.download_to(blob_path, local_path)
         return io.read_json(local_path)
     except Exception as e:

@@ -75,23 +75,6 @@ def process_model_response(text: str, alert: dict, alert_id: int = 0) -> dict:
             "explanation": f"Output non valido: {text}"
         }
 
-
-# Analisi alert per l'endpoint '/chat'
-def analyze_one_alert(alert: dict) -> dict:
-    prompt = build_prompt(alert)
-
-    try:
-        response = res.model.generate_content(prompt, generation_config=res.gen_conf)
-        return process_model_response(response.text, alert)
-    
-    except Exception as e:
-        return {
-            "id": 0,
-            "timestamp": alert.get("time", res.not_available),
-            "class": "error",
-            "explanation": f"{type(e).__name__}: {str(e)}"
-        }
-
 # Analisi asincrona i-esimo alert di batch
 async def analyze_batch_alert(i: int, alert: dict, semaphore) -> dict:
     prompt = build_prompt(alert)
@@ -215,3 +198,26 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
     except Exception as e:
         res.logger.error(f"[CRW][analyze_data][analyze_batch_cached] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
         raise
+
+
+
+# Analisi quesito utente per l'endpoint '/chat'
+def analyze_chat_question(prompt: str, alerts: list[dict], dataset_filename: str) -> dict:
+    blob_path = gcs.get_blob_path(res.gcs_result_dir, dataset_filename, "result", "json")
+
+    try:
+        with open(blob_path, 'r') as f:
+            dataset_results = json.load(f)
+
+        full_prompt = (
+            "Domanda: " + prompt + "\n\n"
+            "Alert selezionati:\n" + json.dumps(alerts, indent=2) + "\n\n"
+            "Risultati dell'intero dataset:\n" + json.dumps(dataset_results[:10], indent=2) + "\n\n"
+            "Fornisci una risposta testuale, tenendo conto sia della domanda che del contesto degli alert e del dataset."
+        )
+
+        return res.model.generate_content(full_prompt, generation_config=res.gen_conf)
+
+    except Exception as e:
+        res.logger.error(f"[data|F__]\t\t-> Failed to generate a response ({type(e).__name__}): {str(e)}")
+        return "Unable to provide a response"

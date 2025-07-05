@@ -1,7 +1,13 @@
-import io, json, asyncio
+import os, io, json, asyncio, posixpath
 import pandas as pd
 
 from utils.resource_manager import resource_manager as res
+
+
+# F01 - Costruzione path remoto (usato in VMS per i file 'result', 'metrics' e 'metadata')
+def get_blob_path(folder: str, dataset_filename: str, suffix: str, file_format: str) -> str:
+    dataset_name = os.path.splitext(dataset_filename)[0]
+    return posixpath.join(folder, f"{dataset_name}_{suffix}.{file_format}")
 
 
 # Caricamento del solo chunk d'interesse dal dataset su GCS (previene memory leaks in RAM)
