@@ -152,3 +152,29 @@ def read_training_dataset() -> list[dict]:
         msg = f"[gcs|F08]\t\t-> Failed to parse '{res.ml_dataset_filename}' to CSV ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
+
+
+# F09 - Rimozione entry duplicate da CSV contenenti le metriche passate dei dataset
+def remove_duplicate_rows():
+    blobs = list(res.bucket.list_blobs(prefix=res.gcs_metrics_dir))
+    
+    for blob in blobs:
+        if not blob.name.endswith(".csv"):
+            continue
+
+        data = blob.download_as_text()
+
+        input_io = io.StringIO(data)
+        output_io = io.StringIO()
+        reader = csv.reader(input_io)
+        writer = csv.writer(output_io)
+        
+        seen = set()
+        for row in reader:
+            row_tuple = tuple(row)
+            if row_tuple not in seen:
+                seen.add(row_tuple)
+                writer.writerow(row)
+
+        blob.upload_from_string(output_io.getvalue(), content_type='text/csv')
+        res.logger.info(f"[GCS][remove_duplicates_in_dir] -> Cleaned duplicates in '{blob.name}'")

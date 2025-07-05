@@ -15,7 +15,7 @@ def merge_handler(event, context):
 
     try:
         # Parametri dell'origine dell'evento trigger
-        bucket_name = event['bucket']
+        bucket_name = event["bucket"]
         object_name = event["name"]
 
         if not object_name.startswith(results_prefix):

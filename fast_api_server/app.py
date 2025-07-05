@@ -92,9 +92,9 @@ async def check_batch_results():
                     metadata = download_metadata(dataset_name) or {}
         
         if not dataset_name or not metadata:
-            raise ValueError(f"[app|E03]\t\t-> Undefined 'dataset_name' field. This field will be available once the first batch result file has been loaded. Try again in a few seconds")
+            raise ValueError(f"Undefined 'dataset_name' field. This field will be available once the first batch result file has been loaded. Try again in a few seconds")
         if not metadata:
-            raise FileNotFoundError(f"[app|E03]\t\t-> Metadata of '{dataset_name}' not found")
+            raise FileNotFoundError(f"Metadata of '{dataset_name}' not found")
 
         batches = metadata.get("num_batches")
         if not isinstance(batches, int) or batches < 1:
@@ -350,6 +350,12 @@ def analyze_metrics(dataset_filename: str = Query(...)):
     # Misura la variabilità relativa rispetto alla media: più la percentuale è bassa, più i dati sono coerenti (vicini alla media).
     # Percentuali maggiori del 15% sono indicative di dati poco coerenti.
     # Non ha unità di misura.
+
+
+@app.get("/remove-dups")
+def remove_dup_rows():
+    gcs.remove_duplicate_rows()
+    return {"message": "Operation completed"}
 
 
 
