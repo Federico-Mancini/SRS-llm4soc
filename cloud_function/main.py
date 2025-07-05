@@ -61,7 +61,7 @@ def merge_handler(event, context):
         # Unificazione e upload file CSV (batch metrics file)
         res.logger.info(f"[CRF][main][merge_handler] -> Saving {n_blobs} batch metrics files in '{gcs_metrics_path}'")
         metrics_data = list(gcs.stream_jsonl_blobs(met_blobs))
-        gcs.upload_json(bucket, gcs_result_path, result_data)
+        gcs.upload_json(bucket, gcs_metrics_path, metrics_data)
         gcs.update_csv(bucket, gcs_metrics_csv_path, metrics_data)
 
     except Exception as e:
