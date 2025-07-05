@@ -37,15 +37,12 @@ def update_csv(bucket: storage.Bucket, path: str, data_gen):
     blob = bucket.blob(path)
     data = list(data_gen)
 
-    print(data)
-
     if not data:
         res.logger.info(f"[CRF][gcs_utils][update_csv] -> No data to append for '{path}'")
         return
 
-    fieldnames = sorted(data[0].keys())
     output_io = io.StringIO()
-    writer = csv.DictWriter(output_io, fieldnames=fieldnames)
+    writer = csv.DictWriter(output_io, fieldnames=data[0].keys())
 
     try:
         if blob.exists():
