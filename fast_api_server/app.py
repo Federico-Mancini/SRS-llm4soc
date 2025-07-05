@@ -2,7 +2,7 @@
 
 import os ,json, posixpath
 import utils.gcs_utils as gcs
-import utils.io_utils as io
+import utils.io_utils as iou
 import utils.metrics_utils as mtr
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query, BackgroundTasks
@@ -225,9 +225,28 @@ def get_result(dataset_filename: str = Query(...)):
     try:
         # Lettura dati
         gcs.download_to(blob_path, local_path)
-        return io.read_json(local_path)
+        return iou.read_json(local_path)
     except Exception as e:
         msg = f"[app|E07]\t\t-> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
+        res.logger.error(msg)
+        raise HTTPException(status_code=500, detail=msg)
+
+
+@app.get("/errors")
+def find_errors(dataset_filename: str = Query(...)):
+    blob_path = gcs.get_blob_path(res.gcs_result_dir, dataset_filename, "result", "json")
+    
+    try:
+        data = gcs.read_json(blob_path)
+        error_ids = [
+            item['batch_id']
+            for item in data
+            if isinstance(item, dict) and item.get('class') == 'error'
+        ]
+        return { "error_batch_ids": error_ids }
+    
+    except Exception as e:
+        msg = f"[app|E__]\t\t-> Failed to read '{blob_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 
@@ -244,7 +263,7 @@ def get_metrics(dataset_filename: str = Query(...)):
     try:
         # Lettura dati
         gcs.download_to(blob_path, local_path)
-        return io.read_json(local_path)
+        return iou.read_json(local_path)
     except Exception as e:
         msg = f"[app|E08]\t\t-> Failed to read '{local_path}' ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)

@@ -22,7 +22,6 @@ def read_json(blob_path: str) -> list | dict:    # se nel file c'è un solo ogge
         raise FileNotFoundError(msg)
     
     try:
-        #return json.loads(blob.download_as_bytes())    # TODO: vecchio codice, da eliminare dopo aver testato il nuovo
         data = json.loads(blob.download_as_text())
     except Exception as e:
         msg = f"[gcs|F02]\t\t-> Failed to read remote JSON in '{blob_path}' ({type(e).__name__}): {str(e)}"

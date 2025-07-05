@@ -83,21 +83,21 @@ async def analyze_batch_alert(i: int, alert: dict, semaphore) -> dict:
         try:
             response = await asyncio.wait_for(
                 asyncio.to_thread(res.model.generate_content, prompt, generation_config=res.gen_conf),
-                timeout=20  # tempo massimo concesso per una risposta
+                timeout=60
             )
             return process_model_response(response.text, alert, i)
         
         except asyncio.TimeoutError:
             return {
-                "id": i,
+                "batch_id": i,
                 "timestamp": alert.get("time", res.not_available),
                 "class": "error",
-                "explanation": "Timeout: il modello ha impiegato troppo tempo per rispondere"
+                "explanation": "Timeout: il modello ha impiegato troppo tempo per rispondere (impostare eventualmente un timeout maggiore)"
             }
     
         except Exception as e:
             return {
-                "id": i,
+                "batch_id": i,
                 "timestamp": alert.get("time", res.not_available),
                 "class": "error",
                 "explanation": f"{type(e).__name__}: {str(e)}"

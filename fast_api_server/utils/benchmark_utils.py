@@ -2,7 +2,7 @@
 
 import os, time, json, shutil, requests
 import utils.gcs_utils as gcs
-import utils.io_utils as io
+import utils.io_utils as iou
 
 from fastapi import HTTPException
 from utils.resource_manager import resource_manager as res 
@@ -149,7 +149,7 @@ def update_config_json(batch_size, max_reqs):
     config["max_concurrent_requests"] = max_reqs
 
     # Aggiornamento 'config.json' locale e remoto
-    io.write_json(config, local_path)           # scrittura file locale
+    iou.write_json(config, local_path)           # scrittura file locale
     gcs.upload_to(local_path, blob_path)    # scirttura file remoto
 
     try:
