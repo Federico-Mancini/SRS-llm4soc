@@ -202,7 +202,7 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
 
 
 # Analisi quesito utente per l'endpoint '/chat'
-def analyze_chat_question(prompt: str, alerts: list[dict] | dict) -> dict:
+def analyze_chat_question(prompt: str, alerts: list[dict] | dict):
     try:
         full_prompt = (
             "Domanda: " + prompt + "\n\n"
