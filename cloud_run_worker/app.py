@@ -83,7 +83,7 @@ async def run_alert(req: Request):
     data = await req.json()
     dataset_filename = data["dataset_filename"]
     question = data["question"]
-    alerts = data["alert"]
+    alerts = data["alerts"]
 
     if not dataset_filename and not question or not alerts:
         msg = f"[CRR][runner][run_alert] -> Missing fields from request body"
