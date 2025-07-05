@@ -67,7 +67,6 @@ async def run_batch(request: Request):
         # Calcolo numero errori di classificazione e aggiornamento metriche
         batch_metrics_path = gcs.get_blob_path(res.gcs_batch_metrics_dir, dataset_name, f"metrics_{batch_id}", "jsonl")
         updated_metrics = mtr.update_metrics(batch_results, len(batch_df), batch_metrics_path)
-        print(f"Updated metrics: {updated_metrics}")
         await gcs.upload_as_jsonl(batch_metrics_path, updated_metrics)
 
         res.logger.info(f"[CRW][app][run_batch] -> Parallel analysis completed: batch result file uploaded into '{batch_results_path}'")
