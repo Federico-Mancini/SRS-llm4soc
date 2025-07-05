@@ -5,7 +5,7 @@ import utils.gcs_utils as gcs
 
 from google.cloud import storage
 from utils.resource_manager import resource_manager as res
-from utils.lock_utils import acquire_lock, release_lock
+from utils.lock_utils import acquire_lock
 
 
 LOCK_NAME = "merge_handler_lock"
