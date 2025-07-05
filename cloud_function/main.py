@@ -1,6 +1,6 @@
 # CRF: Cloud Run Function
 
-import os, posixpath
+import os, datetime, posixpath
 import utils.gcs_utils as gcs
 
 from google.cloud import storage
@@ -49,7 +49,9 @@ def merge_handler(event, context):
             res.logger.info(f"[CRF][main][merge_handler] -> Found only {n_blobs}/{expected_batches} batch result files")
             return
         
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
+        #gcs_metrics_path = posixpath.join(res.gcs_metrics_dir, f"{dataset_name}_metrics_{timestamp}.json")  # il timestamp permette di mantenere anche i vecchi file
         gcs_metrics_path = posixpath.join(res.gcs_metrics_dir, f"{dataset_name}_metrics.json")
 
         # Unificazione e upload file JSON (batch result file)

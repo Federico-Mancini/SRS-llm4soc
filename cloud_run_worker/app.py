@@ -81,15 +81,14 @@ async def run_batch(request: Request):
 @app.post("/run-chatbot")
 async def run_alert(req: Request):
     data = await req.json()
-    dataset_filename = data["dataset_filename"]
     question = data["question"]
     alerts = data["alerts"]
 
-    if not dataset_filename and not question or not alerts:
+    if not question or not alerts:
         msg = f"[CRR][runner][run_alert] -> Missing fields from request body"
         res.logger.error(msg)
         raise HTTPException(status_code=400, detail=msg)
 
     return {
-        "explanation": analyze_chat_question(question, alerts, dataset_filename)
+        "explanation": analyze_chat_question(question, alerts)
     }

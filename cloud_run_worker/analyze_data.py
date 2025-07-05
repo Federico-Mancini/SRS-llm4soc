@@ -202,22 +202,16 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
 
 
 # Analisi quesito utente per l'endpoint '/chat'
-def analyze_chat_question(prompt: str, alerts: list[dict], dataset_filename: str) -> dict:
-    blob_path = gcs.get_blob_path(res.gcs_result_dir, dataset_filename, "result", "json")
-
+def analyze_chat_question(prompt: str, alerts: list[dict]) -> dict:
     try:
-        data_text = res.bucket.blob(blob_path).download_as_text()
-        dataset_results = json.loads(data_text)
-
         full_prompt = (
             "Domanda: " + prompt + "\n\n"
             "Alert selezionati:\n" + json.dumps(alerts, indent=2) + "\n\n"
-            "Risultati dell'intero dataset:\n" + json.dumps(dataset_results[:10], indent=2) + "\n\n"
-            "Fornisci una risposta testuale, tenendo conto sia della domanda che del contesto degli alert e del dataset."
+            "Fornisci una risposta testuale, tenendo conto sia della domanda che del contesto degli alert."
         )
 
         return res.model.generate_content(full_prompt, generation_config=res.gen_conf)
 
     except Exception as e:
         res.logger.error(f"[data|F__]\t\t-> Failed to generate a response ({type(e).__name__}): {str(e)}")
-        return "Unable to provide a response"
+        return f"Failed to generate a response ({type(e).__name__}): {str(e)}"
