@@ -79,7 +79,7 @@ async def run_batch(request: Request):
         }
     
     except Exception as e:
-        msg = f"[CRW][app][run_batch] -> Error ({type(e).__name__}): {str(e)}"
+        msg = f"[CRW][app][run_batch] -> ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)
         return {"detail": msg}
     

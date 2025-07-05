@@ -195,7 +195,7 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
 
         # Lettura metadati del dataset
         metadata = download_metadata(dataset_filename)
-        batch_size = res.batch_size                 # dato estratto qui per avere il valore più recente/aggiornato (invece che in 'create_metadata')
+        batch_size = res.batch_size                 # letto qui per avere il valore più recente/aggiornato (invece che in 'create_metadata')
         n_batches = max(1, (metadata["num_rows"] + batch_size - 1) // batch_size)
 
         metadata["num_batches"] = n_batches         # assegnazione dei dati mancanti

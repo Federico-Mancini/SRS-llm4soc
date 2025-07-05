@@ -25,7 +25,7 @@ def finalize_monitoring(timer_start: float, timestamp_start: float, batch_id: in
     avg_time = elapsed / batch_size if batch_size else 0.0
     alert_throughput = batch_size / elapsed if elapsed else 0
     
-    return {
+    metrics = {
         "batch_id": batch_id,
         "batch_size": batch_size,               # numero alert contenuti in un batch
         "max_concurrent_reqs": concurrency,     # max numero di thread parallelizzabili con asyncio
@@ -36,6 +36,9 @@ def finalize_monitoring(timer_start: float, timestamp_start: float, batch_id: in
         "avg_time_per_alert": avg_time,         # tempo d'elaborazione medio di ogni alert
         "timestamp": timestamp_start            # timestamp istante inizio analisi del batch
     }
+
+    print(f"Final (1) metrics to upload: {metrics}")
+    return metrics
 
 
 # Calcolo errori in batch e aggiornamento metriche
@@ -57,6 +60,7 @@ def update_metrics(batch_results: list[dict], batch_size: int, path: str) -> lis
     metrics["error_rate"] = error_rate              # tasso di classificazione fallite
     metrics["n_timeouts"] = n_timeouts              # numero di errori dovuti a timeout
 
+    print(f"Final (2) metrics to upload: {metrics}")
     return [metrics]
 
 # Elenco nomi metriche (per header CSV):
