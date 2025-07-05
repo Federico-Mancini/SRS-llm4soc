@@ -37,7 +37,6 @@ def finalize_monitoring(timer_start: float, timestamp_start: float, batch_id: in
         "timestamp": timestamp_start            # timestamp istante inizio analisi del batch
     }
 
-    print(f"Final (1) metrics to upload: {metrics}")
     return metrics
 
 
@@ -47,10 +46,22 @@ def update_metrics(batch_results: list[dict], batch_size: int, path: str) -> lis
     error_rate = n_errors / batch_size if batch_size else 0.0
     success_rate = 1 - n_errors / batch_size if batch_size else 0.0
     n_timeouts = sum("Timeout" in r.get("explanation", "") for r in batch_results)
+    print("calcoli fatti")
     
     # Scarica metriche esistenti
-    metrics_text = res.bucket.blob(path).download_as_text()
-    metrics = json.loads(metrics_text)[0]  # metrics è una lista con un solo dizionario
+    blob = res.bucket.blob(path)
+    if not blob.exists():
+        res.logger.error(f"[metrics|F__]\t-> File '{path}' not found")
+        raise FileNotFoundError(f"File '{path}' not found")
+    
+    metrics_text = blob.download_as_text()
+    print("pre json loads")
+    #metrics = json.loads(metrics_text)[0]  # metrics è una lista con un solo dizionario
+    parsed = json.loads(metrics_text)
+    if isinstance(parsed, list) and len(parsed) > 0 and isinstance(parsed[0], dict):
+        metrics = parsed[0]
+    else:
+        raise ValueError(f"Formato inatteso del file metriche ({path}): atteso [{{...}}], ottenuto {type(parsed)} con valore {parsed}")
 
     # Aggiungi le nuove metriche
     metrics["n_classified"] = batch_size - n_errors # classificazioni riuscite
