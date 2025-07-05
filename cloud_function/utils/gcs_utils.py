@@ -24,9 +24,6 @@ def stream_jsonl_blobs(blobs: list[storage.Blob]):
 
 # Upload JSONL files as one JSON
 def upload_json(bucket: storage.Bucket, path: str, data_gen):
-    if check_stop_flag(bucket):
-        return
-    
     blob = bucket.blob(path)
     data = list(data_gen)
     blob.upload_from_string(
@@ -36,10 +33,7 @@ def upload_json(bucket: storage.Bucket, path: str, data_gen):
 
 
 # Aggiorna il file CSV aggiungendo in append i nuovi dati
-def update_csv(bucket: storage.Bucket, path: str, data_gen):
-    if check_stop_flag(bucket):
-        return
-    
+def update_csv(bucket: storage.Bucket, path: str, data_gen):  
     blob = bucket.blob(path)
     data = list(data_gen)
 
@@ -62,17 +56,3 @@ def update_csv(bucket: storage.Bucket, path: str, data_gen):
 
     blob.upload_from_string(output_io.getvalue(), content_type="text/csv")
     res.logger.info(f"[CRF][gcs_utils][update_csv] -> Appended {len(data)} rows (no header) to '{path}'")
-
-
-# Controllo esistenza flag d'interruzione delle operazioni del merge handler
-def check_stop_flag(bucket: storage.Bucket) -> bool:
-    flag_path = f"{res.gcs_flag_dir}/{res.merge_stop_flag_filename}"
-    return bucket.blob(flag_path).exists()
-
-# Creazione flag
-def set_stop_flag(bucket: storage.Bucket) -> bool:
-    flag_path = f"{res.gcs_flag_dir}/{res.merge_stop_flag_filename}"
-    try:
-        bucket.blob(flag_path).upload_from_string("STOP", content_type="text/plain")
-    except Exception as e:
-        res.logger.error(f"[GCS|F__]\t\t-> Failed to create stop flag ({type(e).__name__}): {str(e)}")

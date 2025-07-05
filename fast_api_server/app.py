@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from utils.resource_manager import resource_manager as res
 from utils.benchmark_utils import run_benchmark
 from utils.cloud_utils import call_worker, enqueue_batch_analysis_tasks
+from utils.lock_utils import release_merge_lock
 from utils.metadata_utils import create_metadata, download_metadata, upload_metadata
 
 
@@ -190,7 +191,7 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         # Pulizia e preparazione
         gcs.empty_dir(res.gcs_batch_metrics_dir)    # svuotamento directory dei batch metrics file
         gcs.empty_dir(res.gcs_batch_result_dir)     # svuotamento directory dei batch result file
-        gcs.remove_stop_flag()                      # riattivazione del merge handler
+        release_merge_lock()                        # uscita del merge handler dalla sospensione delle sue attività (eliminazione flag)
 
         # Lettura metadati del dataset
         metadata = download_metadata(dataset_filename)
@@ -233,6 +234,7 @@ def get_result(dataset_filename: str = Query(...)):
         raise HTTPException(status_code=500, detail=msg)
 
 
+#
 @app.get("/errors")
 def find_errors(dataset_filename: str = Query(...)):
     blob_path = gcs.get_blob_path(res.gcs_result_dir, dataset_filename, "result", "json")

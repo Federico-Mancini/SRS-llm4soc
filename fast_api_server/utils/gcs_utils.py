@@ -178,16 +178,3 @@ def remove_duplicate_rows():
         blob.upload_from_string(output_io.getvalue(), content_type='text/csv')
         res.logger.info(f"[GCS][remove_duplicates_in_dir] -> Cleaned duplicates in '{blob.name}'")
         time.sleep(3)   # attesa necessaria per ridurre l'overhead (altrimenti, errore 429)
-
-
-# Rimozione del flag di controllo per l'interruzione delle operazioni del merge handler
-def remove_stop_flag():
-    flag_path = f"{res.gcs_flag_dir}/{res.merge_stop_flag_filename}"
-    blob = res.bucket.blob(flag_path)
-
-    try:    
-        if blob.exists():
-            blob.delete()
-    except Exception as e:
-        res.logger.error(f"[GCS][remove_flag] -> Failed to delete stop flag ({type(e).__name__}): {str(e)}")
-        raise

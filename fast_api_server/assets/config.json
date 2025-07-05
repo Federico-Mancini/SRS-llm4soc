@@ -14,7 +14,7 @@
   "gcs_batch_metrics_dir": "batch_metrics",
   "gcs_batch_result_dir": "batch_results",
 
-  "merge_stop_flag_filename": "merge_stop.flag",
+  "merge_lock_flag_filename": "merge_lock.flag",
   "config_filename": "config.json",
   "result_filename": "result.json",
   "ml_dataset_filename": "training_reg_data.csv",

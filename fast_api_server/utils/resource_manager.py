@@ -26,7 +26,7 @@ class ResourceManager:
         self._gcs_batch_metrics_dir = "batch_metrics"
         self._gcs_batch_result_dir = "batch_results"
 
-        self._merge_stop_flag_filename = "merge_stop.flag"
+        self._merge_lock_flag_filename = "merge_lock.flag"
         self._config_filename = "config.json"
         self._ml_dataset_filename = "training_reg_data.cvs"
 
@@ -72,7 +72,7 @@ class ResourceManager:
         self._gcs_batch_metrics_dir = conf.get("gcs_batch_metrics_dir", self._gcs_batch_metrics_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
         
-        self._merge_stop_flag_filename = conf.get("merge_stop_flag_filename", self._merge_stop_flag_filename)
+        self._merge_lock_flag_filename = conf.get("merge_lock_flag_filename", self._merge_lock_flag_filename)
         self._config_filename = conf.get("config_filename", self._config_filename)
         self._ml_dataset_filename = conf.get("ml_dataset_filename", self._ml_dataset_filename)
         
@@ -218,8 +218,8 @@ class ResourceManager:
         return self._vm_service_account_email
 
     @property
-    def merge_stop_flag_filename(self):
-        return self._merge_stop_flag_filename
+    def merge_lock_flag_filename(self):
+        return self._merge_lock_flag_filename
 
 
 # Istanza singletone da far importare agli altri moduli

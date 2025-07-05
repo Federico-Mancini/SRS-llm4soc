@@ -18,7 +18,7 @@ class ResourceManager:
         self._gcs_result_dir = "results"
         self._gcs_batch_metrics_dir = "batch_metrics"
         self._gcs_batch_result_dir = "batch_results"
-        self._merge_stop_flag_filename = "merge_stop.flag"
+        self._merge_lock_flag_filename = "merge_lock.flag"
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
         self.initialize()
 
@@ -39,7 +39,7 @@ class ResourceManager:
         self._gcs_result_dir = conf.get("gcs_result_dir", self._gcs_result_dir)
         self._gcs_batch_metrics_dir = conf.get("gcs_batch_metrics_dir", self._gcs_batch_metrics_dir)
         self._gcs_batch_result_dir = conf.get("gcs_batch_result_dir", self._gcs_batch_result_dir)
-        self._merge_stop_flag_filename = conf.get("merge_stop_flag_filename", self._merge_stop_flag_filename)
+        self._merge_lock_flag_filename = conf.get("merge_lock_flag_filename", self._merge_lock_flag_filename)
 
         self._initialized = True
         self._logger.info("[RM|F02]\t-> Resource manager initialized")
@@ -74,8 +74,8 @@ class ResourceManager:
         return self._gcs_batch_result_dir
 
     @property
-    def merge_stop_flag_filename(self):
-        return self._merge_stop_flag_filename
+    def merge_lock_flag_filename(self):
+        return self._merge_lock_flag_filename
 
 
 # Istanza singletone da far importare agli altri moduli
