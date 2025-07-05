@@ -204,9 +204,10 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
 # Analisi quesito utente per l'endpoint '/chat'
 def analyze_chat_question(prompt: str, alerts: list[dict] | dict):
     try:
+        alerts_str = alerts if isinstance(alerts, str) else json.dumps(alerts, indent=2, ensure_ascii=False)
         full_prompt = (
-            "Domanda: " + prompt + "\n\n"
-            "Alert selezionati:\n" + alerts + "\n\n"
+            f"Domanda: {prompt}\n\n"
+            f"Alert selezionati:\n{alerts_str}\n\n"
             "Fornisci una risposta testuale, tenendo conto sia della domanda che del contesto degli alert."
         )
 

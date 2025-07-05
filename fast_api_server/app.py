@@ -235,7 +235,7 @@ def get_result(dataset_filename: str = Query(...)):
 
 # -- ANALISI METRICHE -----------------------------------------------------------------------------
 
-# E08 - Visualizzazione file con metriche
+# E08 - Visualizzazione file con metriche dell'ultima analisi effettuata sul dataset specificato
 @app.get("/metrics")
 def get_metrics(dataset_filename: str = Query(...)):
     blob_path = gcs.get_blob_path(res.gcs_metrics_dir, dataset_filename, "metrics", "json")
@@ -243,7 +243,6 @@ def get_metrics(dataset_filename: str = Query(...)):
 
     try:
         # Lettura dati
-        #gcs.convert_metrics_json_to_csv(blob_path)
         gcs.download_to(blob_path, local_path)
         return io.read_json(local_path)
     except Exception as e:
