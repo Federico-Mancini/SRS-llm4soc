@@ -1,6 +1,6 @@
 # CRF: Cloud Run Function
 
-import os, datetime, posixpath
+import os, posixpath
 import utils.gcs_utils as gcs
 
 from google.cloud import storage
