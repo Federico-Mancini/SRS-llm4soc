@@ -59,9 +59,9 @@ def update_metrics(batch_results: list[dict], batch_size: int, path: str) -> lis
     # Aggiungi le nuove metriche
     metrics["n_classified"] = batch_size - n_errors # classificazioni riuscite
     metrics["success_rate"] = success_rate          # tasso di classificazione riuscite
-    metrics["has_errors"] = n_errors > 0            # flag utile per sapere immediatamente se ci sono errori nel batch
     metrics["n_errors"] = n_errors                  # classificazioni fallite
     metrics["error_rate"] = error_rate              # tasso di classificazione fallite
+    metrics["has_errors"] = n_errors > 0            # flag utile per sapere immediatamente se ci sono errori nel batch
     metrics["n_timeouts"] = n_timeouts              # numero di errori dovuti a timeout
 
     return [metrics]
