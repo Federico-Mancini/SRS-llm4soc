@@ -16,7 +16,7 @@ RESULTS_CHECK = "batch-results-status"
 
 
 # F01 - Analisi automatizzata di un dataset, con parametrizzazione variabile
-def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_size_step, max_reqs_inf, max_reqs_sup, max_reqs_step):
+async def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_size_step, max_reqs_inf, max_reqs_sup, max_reqs_step):
     # Eliminazione di eventuali flag residue
     if os.path.exists(res.vms_benchmark_stop_flag):
         os.remove(res.vms_benchmark_stop_flag)
@@ -60,7 +60,7 @@ def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_size_s
                 return
 
             # Aggiornamento variabili d'ambiente su JSON
-            update_config_json(curr_batch_size, curr_max_reqs)
+            await update_config_json(curr_batch_size, curr_max_reqs)
             update_benchmark_context(
                 tot_alerts=tot_alerts,
                 batch_size=curr_batch_size,
@@ -106,7 +106,7 @@ def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_size_s
             # res.logger.info(f"[benchmark|F01]\t-> Dataset analysis completed, now sending request to '/{METRICS_ANALYSIS}'")
             # requests.get(f"http://localhost:8000/{METRICS_ANALYSIS}?dataset_filename={dataset_filename}")
             # update_benchmark_context(last_request=f"/{METRICS_ANALYSIS}", status="running")
-            res.logger.info(f"[benchmark|F01]\t-> Dataset analysis completed")
+            res.logger.info(f"[benchmark|F01]\t-> Dataset analysis completed. Waiting 60 seconds as inter-analysis buffer")
             update_benchmark_context(status="running")
 
             curr_max_reqs = get_next_val(curr=curr_max_reqs, sup=max_reqs_sup, step=max_reqs_step)
@@ -140,7 +140,7 @@ def restore_config():
 
 
 # F04 - Aggiornamento variabili d'ambiente in 'config.json'
-def update_config_json(batch_size, max_reqs):
+async def update_config_json(batch_size, max_reqs):
     local_path = res.vms_config_path
     blob_path = res.config_filename
 
@@ -158,7 +158,7 @@ def update_config_json(batch_size, max_reqs):
     try:
         # Aggiornamento dati salvati in resource manager locale (VMS) e remoto (CRW)
         res.reload_config()
-        response = call_worker("GET", f"{res.worker_url}/reload-config")
+        response = await call_worker("GET", f"{res.worker_url}/reload-config")
         print(f"DEBUG in benchm_u - response from worker: {response}")
     except Exception as e:
         msg = f"[benchmark|F04]\t-> ({type(e).__name__}): {str(e)}"

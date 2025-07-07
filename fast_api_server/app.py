@@ -409,6 +409,7 @@ def start_benchmark(
         max_reqs_sup,
         max_reqs_step
     )
+    
     return {"message": "Benchmark started in background. Keep an eye on the server log to spot eventual errors"}
 
 
