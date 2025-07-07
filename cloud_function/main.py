@@ -46,12 +46,12 @@ def merge_handler(event, context):
             res.logger.warning("[main|F01]\t\t-> 'n_batches' undefined in metadata")
             return
         
-        n_blobs = len(res_blobs)
-        if n_blobs < expected_batches:
+        n_blobs = len(res_blobs) + len(met_blobs)
+        if n_blobs < expected_batches * 2:
             res.logger.info(f"[main|F01]\t\t-> Found only {n_blobs}/{expected_batches} batch result files")
             return
         
-        ### START - Sezione critica: acquisizione lock (creazione flag)
+        # Acquisizione lock (creazione flag)
         if not acquire_lock(bucket):
             return
         
