@@ -131,6 +131,7 @@ def restore_config():
     if os.path.exists(res.vms_config_backup_path):
         shutil.copy(res.vms_config_backup_path, res.vms_config_path)
         os.remove(res.vms_config_backup_path)
+        res.reload_config()
         res.logger.info(f"[benchmark|F03]\t-> Original '{res.config_filename}' restored and backup deleted")
     else:
         res.logger.warning("[benchmark|F03]\t-> No backup found to restore")

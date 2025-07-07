@@ -24,10 +24,6 @@ def merge_handler(event, context):
         
         bucket = storage.Client().bucket(bucket_name)
 
-        ### START - Sezione critica: acquisizione lock (creazione flag)
-        if not acquire_lock(bucket):
-            return
-
         # Estrazione file (risultati e metriche)
         res_blobs = list(bucket.list_blobs(prefix=results_prefix))
         met_blobs = list(bucket.list_blobs(prefix=metrics_prefix))
@@ -53,6 +49,10 @@ def merge_handler(event, context):
         n_blobs = len(res_blobs)
         if n_blobs < expected_batches:
             res.logger.info(f"[main|F01]\t\t-> Found only {n_blobs}/{expected_batches} batch result files")
+            return
+        
+        ### START - Sezione critica: acquisizione lock (creazione flag)
+        if not acquire_lock(bucket):
             return
         
         gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
