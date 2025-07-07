@@ -5,18 +5,13 @@ import utils.gcs_utils as gcs
 import utils.io_utils as iou
 import utils.metrics_utils as mtr
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from utils.resource_manager import resource_manager as res
-from utils.benchmark_utils import run_benchmark
 from utils.cloud_utils import call_worker, enqueue_batch_analysis_tasks
 from utils.lock_utils import release_merge_lock
 from utils.metadata_utils import create_metadata, download_metadata, upload_metadata
 
-
-DEFAULT_BATCH_SIZE_SUP = 250
-DEFAULT_MAX_REQS_SUP = 16
 
 
 # == API configuration ============================================================================
@@ -29,6 +24,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+# Comando per lanciare il server:
+#   uvicorn app:app --host 0.0.0.0 --port 8000
+
 
 # F01 - Function 1
 @app.on_event("startup")
@@ -372,63 +370,3 @@ def analyze_metrics(dataset_filename: str = Query(...)):
     # Misura la variabilità relativa rispetto alla media: più la percentuale è bassa, più i dati sono coerenti (vicini alla media).
     # Percentuali maggiori del 15% sono indicative di dati poco coerenti.
     # Non ha unità di misura.
-
-
-
-# -- BENCHMARK ------------------------------------------------------------------------------------
-
-# E10 - Esecuzione automatizzata di analisi dataset con parametrizzazione variabile
-@app.get("/start-benchmark")
-def start_benchmark(
-    background_tasks: BackgroundTasks,
-    dataset_filename: str = Query(...),
-    batch_size_inf: int = Query(1),
-    batch_size_sup: int = Query(DEFAULT_BATCH_SIZE_SUP),
-    batch_size_step: int = Query(1),
-    max_reqs_inf: int = Query(1),
-    max_reqs_sup: int = Query(DEFAULT_MAX_REQS_SUP),
-    max_reqs_step: int = Query(1)
-):
-    if batch_size_sup > DEFAULT_BATCH_SIZE_SUP:
-        msg = f"[app|E10]\t\t-> 'sup_batch_size' cannot exceed {DEFAULT_BATCH_SIZE_SUP}"
-        res.logger.error(msg)
-        raise HTTPException(status_code=400, detail=msg)
-    if max_reqs_sup > DEFAULT_MAX_REQS_SUP:
-        msg = f"[app|E10]\t\t-> 'sup_max_reqs' cannot exceed {DEFAULT_MAX_REQS_SUP}"
-        res.logger.error(msg)
-        raise HTTPException(status_code=400, detail=msg)
-    
-
-    background_tasks.add_task(
-        run_benchmark,
-        dataset_filename,
-        batch_size_inf,
-        batch_size_sup,
-        batch_size_step,
-        max_reqs_inf,
-        max_reqs_sup,
-        max_reqs_step
-    )
-    
-    return {"message": "Benchmark started in background. Keep an eye on the server log to spot eventual errors"}
-
-
-# E11 - Terminazione benchmark in esecuzione
-@app.get("/stop-benchmark")
-def stop_benchmark():
-    with open(res.vms_benchmark_stop_flag, "w") as f:   # creazione di un flag file per segnalare l'intenzione di terminare al benchmark
-        f.write("stop")
-    return {"status": "Benchmark interruption signal sent"}
-
-
-# E12 - Monitoraggio stato del benchmark
-@app.get("/benchmark-status")
-def check_benchmark_status():
-    try:
-        with open(res.vms_benchmark_context_path, "r", encoding="utf-8") as f:
-            state = json.load(f)
-        return JSONResponse(content=state)
-    except Exception as e:
-        msg = f"[app|E10]\t\t-> Failed to read benchmark context: {str(e)}"
-        res.logger.error(msg)
-        raise HTTPException(status_code=500, detail=msg)

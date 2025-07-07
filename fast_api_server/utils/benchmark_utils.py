@@ -1,6 +1,6 @@
 # Benchmark Utils: modulo dedicato alla gestione automatizzata dell'analisi di un dataset, eseguita con parametri dinamici
 
-import os, time, json, shutil, requests
+import os, time, json, threading, shutil, requests
 import utils.gcs_utils as gcs
 import utils.io_utils as iou
 
@@ -16,7 +16,15 @@ RESULTS_CHECK = "batch-results-status"
 
 
 # F01 - Analisi automatizzata di un dataset, con parametrizzazione variabile
-async def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_size_step, max_reqs_inf, max_reqs_sup, max_reqs_step):
+async def run_benchmark(
+    dataset_filename,
+    batch_size_inf,
+    batch_size_sup,
+    batch_size_step,
+    max_reqs_inf,
+    max_reqs_sup,
+    max_reqs_step
+):
     # Eliminazione di eventuali flag residue
     if os.path.exists(res.vms_benchmark_stop_flag):
         os.remove(res.vms_benchmark_stop_flag)
@@ -69,8 +77,11 @@ async def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_
             )
 
             # Invio richiesta HTTP ad '/analyze-dataset'
+            def request_analysis():
+                requests.get(f"http://localhost:8000/{DATASET_ANALYSIS}?dataset_filename={dataset_filename}", timeout=30)
+            
             res.logger.info(f"[benchmark|F01]\t-> Sending request to '/{DATASET_ANALYSIS}'")
-            requests.get(f"http://localhost:8000/{DATASET_ANALYSIS}?dataset_filename={dataset_filename}", timeout = 60)
+            threading.Thread(target=request_analysis).start()   # creazione thread separato per permettere al server di chiamare se stesso senza creare deadlock
 
             # Polling su '/monitor-batch-results'
             update_benchmark_context(last_request=f"/{RESULTS_CHECK}", status="polling")
@@ -106,12 +117,12 @@ async def run_benchmark(dataset_filename, batch_size_inf, batch_size_sup, batch_
             # res.logger.info(f"[benchmark|F01]\t-> Dataset analysis completed, now sending request to '/{METRICS_ANALYSIS}'")
             # requests.get(f"http://localhost:8000/{METRICS_ANALYSIS}?dataset_filename={dataset_filename}")
             # update_benchmark_context(last_request=f"/{METRICS_ANALYSIS}", status="running")
-            res.logger.info(f"[benchmark|F01]\t-> Dataset analysis completed. Waiting 60 seconds as inter-analysis buffer")
+            res.logger.info(f"[benchmark|F01]\t-> Dataset analysis completed. Waiting 30 seconds as inter-analysis buffer")
             update_benchmark_context(status="running")
 
             curr_max_reqs = get_next_val(curr=curr_max_reqs, sup=max_reqs_sup, step=max_reqs_step)
             if curr_batch_size != batch_size_sup or curr_max_reqs != max_reqs_sup:  # se è l'ultima iterazione, non attendo 1 minuto
-                time.sleep(60)  # apparentemente man mano che si inviano richieste senza sosta, i tempi d'elaborazione si allungano. Una breve pausa intermedia aiuta a tornare in margini accettabili
+                time.sleep(30)  # apparentemente man mano che si inviano richieste senza sosta, i tempi d'elaborazione si allungano. Una breve pausa intermedia aiuta a tornare in margini accettabili
 
         curr_batch_size = get_next_val(curr=curr_batch_size, sup=batch_size_sup, step=batch_size_step)
 
@@ -158,8 +169,7 @@ async def update_config_json(batch_size, max_reqs):
     try:
         # Aggiornamento dati salvati in resource manager locale (VMS) e remoto (CRW)
         res.reload_config()
-        response = await call_worker("GET", f"{res.worker_url}/reload-config")
-        print(f"DEBUG in benchm_u - response from worker: {response}")
+        await call_worker("GET", f"{res.worker_url}/reload-config")
     except Exception as e:
         msg = f"[benchmark|F04]\t-> ({type(e).__name__}): {str(e)}"
         res.logger.error(msg)

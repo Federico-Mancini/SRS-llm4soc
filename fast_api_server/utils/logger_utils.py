@@ -1,10 +1,7 @@
 #NB: non usare la classe ResourceManager, o potrebbero verificarsi dei loop di import
 
-import os, logging
+import logging
 
-
-# Creazione directory in cui salvare log (se non già presente)
-os.makedirs("assets", exist_ok=True)
 
 # Istanziazione il logger
 logger = logging.getLogger("llm4soc-VMS")
