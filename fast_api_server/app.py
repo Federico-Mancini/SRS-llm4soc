@@ -146,8 +146,8 @@ async def upload_dataset(file: UploadFile = File(...)):
     dataset_filename = file.filename
 
     # Controllo estensione file ricevuto
-    if not dataset_filename.endswith((".jsonl", ".csv")):
-        msg = f"[app|E05]\t\t-> Invalid file format: '{dataset_filename}' is not '.jsonl' or '.csv'"
+    if not dataset_filename.endswith((".json", ".jsonl", ".csv")):
+        msg = f"[app|E05]\t\t-> Invalid file format: '{dataset_filename}' is not '.json', '.jsonl' or '.csv'"
         res.logger.warning(msg)
         raise HTTPException(status_code=400, detail=msg)
     
@@ -201,7 +201,7 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         metadata["num_batches"] = n_batches         # assegnazione dei dati mancanti
         metadata["batch_size"] = batch_size
 
-        upload_metadata(dataset_filename, metadata) # upload dei nuovi metadati su GCS
+        upload_metadata (dataset_filename, metadata) # upload dei nuovi metadati su GCS
         
         # Creazione e analisi dei singoli batch tramite Cloud Task
         enqueue_batch_analysis_tasks(metadata)

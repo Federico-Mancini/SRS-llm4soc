@@ -11,33 +11,33 @@ LOCATION = "europe-west1"
 MODEL_NAME = "gemini-2.0-flash-001"
 
 
-# Initialize Vertex AI
+# F01 - Initialize Vertex AI
 def init():
     try:
-        logger.info(f"[CRW][vertexai_utils][init] -> Initializing Vertex AI with project '{PROJECT_ID}' and location '{LOCATION}'...")
+        logger.info(f"[vertex|F01]\t-> Initializing Vertex AI with project '{PROJECT_ID}' and location '{LOCATION}'...")
         vertexai.init(project=PROJECT_ID, location=LOCATION)
 
     except Exception as e:
-        msg = f"[CRW][vertexai_utils][init] -> Failed to initialize Vertex AI: {str(e)}"
+        msg = f"[vertex|F01]\t-> Failed to initialize Vertex AI: {str(e)}"
         logger.error(msg)
         raise RuntimeError(msg)
 
 
-# Load the generative model
+# F02 - Load the generative model
 def get_model() -> GenerativeModel:
     try:
-        logger.info(f"[CRW][vertexai_utils][get_model] -> Loading model '{MODEL_NAME}'")
+        logger.info(f"[vertex|F02]\t-> Loading model '{MODEL_NAME}'")
         model = GenerativeModel(MODEL_NAME)
 
         return model
     
     except Exception as e:
-        msg = f"[CRW][vertexai_utils][get_model] -> Failed to load Vertex AI model: {str(e)}"
+        msg = f"[vertex|F02]\t-> Failed to load Vertex AI model: {str(e)}"
         logger.error(msg)
         raise RuntimeError(msg)
 
 
-# Configuration (low temperature = more deterministic)
+# F03 - Configuration (low temperature = more deterministic)
 def get_generation_config() -> GenerationConfig:
     return GenerationConfig(
         temperature=0.2,

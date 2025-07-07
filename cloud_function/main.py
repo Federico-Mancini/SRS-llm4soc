@@ -53,7 +53,7 @@ def merge_handler(event, context):
         
         # Acquisizione lock (creazione flag)
         if not acquire_lock(bucket):
-            return
+            return  
         
         gcs_result_path = posixpath.join(res.gcs_result_dir, f"{dataset_name}_result.json")
         gcs_metrics_path = posixpath.join(res.gcs_metrics_dir, f"{dataset_name}_metrics.json")
@@ -64,7 +64,7 @@ def merge_handler(event, context):
         result_data = list(gcs.stream_jsonl_blobs(res_blobs))
         gcs.upload_json(bucket, gcs_result_path, result_data)
 
-        time.sleep(1)
+        time.sleep(1)   # NB: necessario per permettere la corretta generazione di tutti i file metrics
 
         # Unificazione e upload file CSV (batch metrics file)
         res.logger.info(f"[main|F01]\t\t-> Saving {n_blobs} batch metrics files in '{gcs_metrics_path}'")

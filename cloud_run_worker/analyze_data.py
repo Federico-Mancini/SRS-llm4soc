@@ -7,6 +7,7 @@ from utils.resource_manager import resource_manager as res
 from utils.cache_utils import alert_hash, cleanup_cache, download_cache, upload_cache
 
 
+# F01 - Costruzione prompt per richiesta Gemini
 def build_prompt(alert) -> str:
     return f"""
 Sei un assistente di sicurezza informatica. Ricevi un alert da un sistema IDS.
@@ -36,7 +37,7 @@ ALERT:
 Rispondi con un oggetto JSON singolo, su una sola riga.
 """.strip()
 
-# TODO: da testare
+# F01B - TODO: da testare
 def build_prompt_optimized(alert) -> str:
     return f"""
         Classifica l'alert IDS come 'false_positive' o 'real_threat' e spiega brevemente il motivo, in italiano tecnico.
@@ -48,7 +49,7 @@ def build_prompt_optimized(alert) -> str:
     """
 
 
-# Interpretazione risposta Gemini & costruzione JSON da restituire
+# F02 - Interpretazione risposta Gemini & costruzione JSON da restituire
 def process_model_response(text: str, alert: dict, alert_id: int = 0) -> dict:
     text = text.strip()
 
@@ -66,7 +67,7 @@ def process_model_response(text: str, alert: dict, alert_id: int = 0) -> dict:
     
     except json.JSONDecodeError as e:
         msg = text[:200].replace("\n", " ").replace("\"", "'")  # visualizzazione dei primi 200 caratteri, leggermente formattati per leggibilità
-        res.logger.warning(f"[CRW][analyze_data][process_model_response] Failed to parse JSON: {str(e)} | Response: {msg}")
+        res.logger.warning(f"[data|F03]\t\t-> Failed to parse JSON: {str(e)} | Response: {msg}")
 
         return {
             "id": alert_id,
@@ -75,7 +76,7 @@ def process_model_response(text: str, alert: dict, alert_id: int = 0) -> dict:
             "explanation": f"Output non valido: {text}"
         }
 
-# Analisi asincrona i-esimo alert di batch
+# F03 - Analisi asincrona i-esimo alert di batch
 async def analyze_batch_alert(i: int, alert: dict, semaphore) -> dict:
     prompt = build_prompt(alert)
     
@@ -104,9 +105,9 @@ async def analyze_batch_alert(i: int, alert: dict, semaphore) -> dict:
             }
 
 
-# Analisi asincrona di batch
+# F04 - Analisi asincrona di batch
 async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, dataset_name: str) -> list[dict]:
-    res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
+    res.logger.info(f"[data|F04]\t\t-> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
     timer_start, timestamp_start = mtr.init_monitoring()
 
     batch_size = len(batch_df)
@@ -126,21 +127,21 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
         results = await asyncio.gather(*tasks)  # unione dei risultati dei singoli task: creazione file result del batch
         
         # Metriche
-        metrics = mtr.finalize_monitoring(timer_start, timestamp_start, batch_id, batch_size)
+        metrics = mtr.finalize_monitoring(timer_start, timestamp_start, batch_id, batch_size, concurrency)
         metrics_path = gcs.get_blob_path(res.gcs_batch_metrics_dir, dataset_name, f"metrics_{batch_id}", "jsonl")
         await gcs.upload_as_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
         
-        res.logger.info(f"[CRW][analyze_data][analyze_batch] -> Batch {batch_id}, time elapsed: {metrics['time_sec']}s")
+        res.logger.info(f"[data|F04]\t\t-> Batch {batch_id}, time elapsed: {metrics['time_sec']}s")
 
         return results
 
     except Exception as e:
-        res.logger.error(f"[CRW][analyze_data][analyze_batch] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
+        res.logger.error(f"[data|F04]\t\t-> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
         raise
 
-# Analisi asincrona di batch con gestione cache
+# F04B - Analisi asincrona di batch con gestione cache (OUTDATED!)
 async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row: int, dataset_name: str) -> list[dict]:
-    res.logger.info(f"[CRW][analyze_data][analyze_batch_cached] -> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
+    res.logger.info(f"[data|F04B]\t\t-> Processing batch {batch_id} containing {batch_df.shape[0]} alerts")
     start = mtr.init_monitoring()
 
     concurrency = min(len(batch_df), res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
@@ -192,17 +193,17 @@ async def analyze_batch_cached(batch_df: pd.DataFrame, batch_id: int, start_row:
         metrics_path = f"{res.gcs_batch_metrics_dir}/{dataset_name}_batch_{batch_id}.jsonl"
         await gcs.upload_as_jsonl(metrics_path, [metrics]) # NB: passare le metriche dentro una lista
         
-        res.logger.info(f"[CRW][analyze_data][analyze_batch_cached] -> Batch {batch_id}, Time elapsed: {metrics['time_sec']}s, RAM usage: {metrics['ram_mb']}MB")
+        res.logger.info(f"[data|F04B]\t\t-> Batch {batch_id}, Time elapsed: {metrics['time_sec']}s, RAM usage: {metrics['ram_mb']}MB")
         
         return results
 
     except Exception as e:
-        res.logger.error(f"[CRW][analyze_data][analyze_batch_cached] -> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
+        res.logger.error(f"[data|F04B]\t\t-> Error in batch {batch_id} ({type(e).__name__}): {str(e)}")
         raise
 
 
 
-# Analisi quesito utente per l'endpoint '/chat'
+# F05 - Analisi quesito utente per l'endpoint '/chat'
 def analyze_chat_question(question: str, alerts: list[dict] | dict):
     try:
         alerts_str = alerts if isinstance(alerts, str) else json.dumps(alerts, indent=2, ensure_ascii=False)
@@ -215,5 +216,5 @@ def analyze_chat_question(question: str, alerts: list[dict] | dict):
         return res.model.generate_content(full_prompt, generation_config=res.gen_conf).text
 
     except Exception as e:
-        res.logger.error(f"[data|F__]\t\t-> Failed to generate a response ({type(e).__name__}): {str(e)}")
+        res.logger.error(f"[data|F05]\t\t-> Failed to generate a response ({type(e).__name__}): {str(e)}")
         raise

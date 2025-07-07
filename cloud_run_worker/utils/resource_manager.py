@@ -10,6 +10,7 @@ CONFIG_FILENAME = "config.json"
 
 
 class ResourceManager:
+    # F01 - Costruttore
     def __init__(self):
         self._initialized = False
         self._logger = logger
@@ -26,6 +27,7 @@ class ResourceManager:
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
         self.initialize()
 
+    # F02 - Inizializzazione
     def initialize(self):
         if self._initialized:
             return
@@ -53,13 +55,14 @@ class ResourceManager:
         # Warm-up modello Gemini (risolve il problema del Cold Start o del caricamento on-demand del modello AI)
         try:
             self._model.generate_content("ping", generation_config=self._gen_conf)
-            self._logger.info("[CRW][resource_manager][initialize] Warm-up request sent to Gemini")
+            self._logger.info("[RM|F02]\t\t-> Warm-up request sent to Gemini")
         except Exception as e:
-            self._logger.warning(f"[CRW][resource_manager][initialize] Warm-up failed ({type(e).__name__}): {str(e)}")
+            self._logger.warning(f"[RM|F02]\t\t-> Warm-up failed ({type(e).__name__}): {str(e)}")
 
         self._initialized = True
-        self._logger.info("[RM|F02]\t-> Resource manager initialized")
+        self._logger.info("[RM|F02]\t\t-> Resource manager initialized")
         
+    # F03 - Aggiornamento dei valori assegnati alle variabili private
     def reload_config(self):
         conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
         self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)

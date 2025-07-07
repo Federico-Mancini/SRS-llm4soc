@@ -9,6 +9,7 @@ CONFIG_FILENAME = "config.json"
 
 
 class ResourceManager:
+    # F01 - Costruttore
     def __init__(self):
         self._initialized = False
         self._logger = logger
@@ -22,6 +23,7 @@ class ResourceManager:
         # (dove possibile, impostare come valori di default quelli locali al server Fast API)
         self.initialize()
 
+    # F02 - Inizializzazione
     def initialize(self):
         if self._initialized:
             return

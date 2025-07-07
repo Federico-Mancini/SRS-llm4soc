@@ -2,25 +2,24 @@ import os, time, json, psutil
 from utils.resource_manager import resource_manager as res
 
 
-# RAM usata dal processo
+# F01 - Calcolo RAM usata dal processo
 def get_memory_usage_mb() -> float:
     process = psutil.Process(os.getpid())
     return process.memory_info().rss / 1024 / 1024
 
 
-# Inizio misurazione consumi
+# F02 - Inizio misurazione consumi
 def init_monitoring() -> tuple[float, float]:
     return time.perf_counter(), time.time()
     # time.perf_counter():  timer, usato per misurare durata analisi batch
     # time.time():          timestamp assoluto (epoch time), usato per registrare istante d'inizio di analisi batch
 
 
-# Finalizzazione misurazioni
-def finalize_monitoring(timer_start: float, timestamp_start: float, batch_id: int, batch_size: int) -> dict:
+# F03 - Finalizzazione misurazioni
+def finalize_monitoring(timer_start: float, timestamp_start: float, batch_id: int, batch_size: int, concurrency: int) -> dict:
     elapsed = time.perf_counter() - timer_start
     ram = get_memory_usage_mb()
 
-    concurrency = res.max_concurrent_requests
     parallelism_used = min(batch_size, concurrency)
     avg_time = elapsed / batch_size if batch_size else 0.0
     alert_throughput = batch_size / elapsed if elapsed else 0
@@ -40,7 +39,7 @@ def finalize_monitoring(timer_start: float, timestamp_start: float, batch_id: in
     return metrics
 
 
-# Calcolo errori in batch e aggiornamento metriche
+# F04 - Calcolo errori in batch e aggiornamento metriche
 def update_metrics(batch_results: list[dict], batch_size: int, path: str) -> list[dict]:
     n_errors = sum(1 for r in batch_results if r.get("class") == "error")
     error_rate = n_errors / batch_size if batch_size else 0.0
@@ -50,7 +49,7 @@ def update_metrics(batch_results: list[dict], batch_size: int, path: str) -> lis
     # Scarica metriche esistenti
     blob = res.bucket.blob(path)
     if not blob.exists():
-        res.logger.error(f"[metrics|F__]\t-> File '{path}' not found")
+        res.logger.error(f"[metrics|F04]\t-> File '{path}' not found")
         raise FileNotFoundError(f"File '{path}' not found")
     
     metrics_text = blob.download_as_text()

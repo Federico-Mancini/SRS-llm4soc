@@ -18,6 +18,6 @@ def acquire_lock(bucket: storage.Bucket) -> bool:
 #     try:
 #         bucket.blob(lock_path).delete()
 #     except Exception as e:
-#         res.logger.error(f"[GCS][release_lock] -> Failed to release lock ({type(e).__name__}): {str(e)}")
+#         res.logger.error(f"[lock|F02]\t\t-> Failed to release lock ({type(e).__name__}): {str(e)}")
 
 # NB: l'eliminazione del flag è delegata all'endpoint '/analyze-dataset' del server FastAPI
