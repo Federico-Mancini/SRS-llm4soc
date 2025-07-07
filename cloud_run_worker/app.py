@@ -28,7 +28,7 @@ async def health():
     return {"status": "running"}
 
 
-# E03 - Aggiornamento variabili d'ambiente modificato a runtime (ad esempio dal benchmark)
+# E03 - Aggiornamento variabili d'ambiente modificate a runtime (in particolare, dal benchmark)
 @app.get("/reload-config")
 async def reload_config():
     res.reload_config()

@@ -13,6 +13,7 @@ MAX_POLLING_ATTEMPTS = 20
 DATASET_ANALYSIS = "analyze-dataset"
 METRICS_ANALYSIS = "analyze-metrics"
 RESULTS_CHECK = "batch-results-status"
+CONFIG_RELOADING = "reload-config"
 
 
 # F01 - Analisi automatizzata di un dataset, con parametrizzazione variabile
@@ -56,7 +57,8 @@ async def run_benchmark(
         status="running"
     )
     
-    while curr_batch_size <= min(batch_size_sup, tot_alerts):
+    revised_batch_size_sup = min(batch_size_sup, tot_alerts)
+    while curr_batch_size <= revised_batch_size_sup:
         curr_max_reqs = 4 if curr_batch_size > 100 else max_reqs_inf
         # NB: all'aumentare della dimensione dei batch, il numero di thread paralleli viene resettato a un nuovo limite inferiore pari a 4.
         #     Questo permette di velocizzare i tempi e di non considerare i casi estremi in cui viene elaborato un batch da centinaia
@@ -77,11 +79,8 @@ async def run_benchmark(
             )
 
             # Invio richiesta HTTP ad '/analyze-dataset'
-            def request_analysis():
-                requests.get(f"http://localhost:8000/{DATASET_ANALYSIS}?dataset_filename={dataset_filename}", timeout=30)
-            
             res.logger.info(f"[benchmark|F01]\t-> Sending request to '/{DATASET_ANALYSIS}'")
-            threading.Thread(target=request_analysis).start()   # creazione thread separato per permettere al server di chiamare se stesso senza creare deadlock
+            requests.get(f"http://localhost:8000/{DATASET_ANALYSIS}?dataset_filename={dataset_filename}", timeout=30)   # da far invocare al benchmark in esecuzione come server alternativo su una porta diversa, altrimenti deadlock
 
             # Polling su '/monitor-batch-results'
             update_benchmark_context(last_request=f"/{RESULTS_CHECK}", status="polling")
@@ -101,7 +100,7 @@ async def run_benchmark(
                         res.logger.error(f"[benchmark|F01]\t-> Polling failed: '/{RESULTS_CHECK}' returned status {response.status_code}")
                         return
                     
-                    res.logger.warning(f"[benchmark|F01]\t-> Attempt {attempts + 1}/{MAX_POLLING_ATTEMPTS}")
+                    res.logger.warning(f"[benchmark|F01]\t-> Attempt {attempts + 1}/{MAX_POLLING_ATTEMPTS}: no batch results found yet")
                     polling_period = 5 + attempts^2
                     time.sleep(polling_period if polling_period < 60 else 60)   # attesa esponenziale, con limite superiore fissato a 60
                     attempts += 1
@@ -121,14 +120,14 @@ async def run_benchmark(
             update_benchmark_context(status="running")
 
             curr_max_reqs = get_next_val(curr=curr_max_reqs, sup=max_reqs_sup, step=max_reqs_step)
-            if curr_batch_size != batch_size_sup or curr_max_reqs != max_reqs_sup:  # se è l'ultima iterazione, non attendo 1 minuto
+            if curr_batch_size != revised_batch_size_sup or curr_max_reqs != max_reqs_sup:  # se è l'ultima iterazione, non attendo 1 minuto
                 time.sleep(30)  # apparentemente man mano che si inviano richieste senza sosta, i tempi d'elaborazione si allungano. Una breve pausa intermedia aiuta a tornare in margini accettabili
 
-        curr_batch_size = get_next_val(curr=curr_batch_size, sup=batch_size_sup, step=batch_size_step)
+        curr_batch_size = get_next_val(curr=curr_batch_size, sup=revised_batch_size_sup, step=batch_size_step)
 
     restore_config()
     update_benchmark_context(status="completed")
-    res.logger.info("[benchmark|F01]\t-> Benchmark naturally completed")
+    res.logger.info(f"[benchmark|F01]\t-> Benchmark naturally completed with batch size {curr_batch_size-1}/{revised_batch_size_sup} and max reqs {curr_max_reqs-1}/{max_reqs_sup}")
 
 
 # F02 - Salvataggio di variabili d'ambiente originali in un file copia temporaneo
@@ -163,15 +162,16 @@ async def update_config_json(batch_size, max_reqs):
     config["max_concurrent_requests"] = max_reqs
 
     # Aggiornamento 'config.json' locale e remoto
-    iou.write_json(config, local_path)           # scrittura file locale
+    iou.write_json(config, local_path)      # scrittura file locale
     gcs.upload_to(local_path, blob_path)    # scirttura file remoto
 
     try:
         # Aggiornamento dati salvati in resource manager locale (VMS) e remoto (CRW)
-        res.reload_config()
+        #res.reload_config()    # NB: va considerato che questo codice deve essere importato ed eseguito da benchmark.py, la quale esegue come server su porta e processi diversi, quindi una modifica al manager non si riflette sul manager del server FastAPI
+        requests.get(f"http://localhost:8000/{CONFIG_RELOADING}", timeout=10)
         await call_worker("GET", f"{res.worker_url}/reload-config")
     except Exception as e:
-        msg = f"[benchmark|F04]\t-> ({type(e).__name__}): {str(e)}"
+        msg = f"[benchmark|F04]\t-> {type(e).__name__}: {str(e)}"
         res.logger.error(msg)
         raise HTTPException(status_code=500, detail=msg)
 

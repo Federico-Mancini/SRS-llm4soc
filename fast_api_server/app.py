@@ -199,7 +199,7 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         metadata["num_batches"] = n_batches         # assegnazione dei dati mancanti
         metadata["batch_size"] = batch_size
 
-        upload_metadata (dataset_filename, metadata) # upload dei nuovi metadati su GCS
+        upload_metadata(dataset_filename, metadata) # upload dei nuovi metadati su GCS
         
         # Creazione e analisi dei singoli batch tramite Cloud Task
         enqueue_batch_analysis_tasks(metadata)
@@ -370,3 +370,10 @@ def analyze_metrics(dataset_filename: str = Query(...)):
     # Misura la variabilità relativa rispetto alla media: più la percentuale è bassa, più i dati sono coerenti (vicini alla media).
     # Percentuali maggiori del 15% sono indicative di dati poco coerenti.
     # Non ha unità di misura.
+
+
+# E10 - Aggiornamento variabili d'ambiente modificate a runtime (in particolare, dal benchmark)
+@app.get("/reload-config")
+async def reload_config():
+    res.reload_config()
+    return {"message": "Resource manager reloaded"}
