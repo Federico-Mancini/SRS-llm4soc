@@ -112,6 +112,7 @@ async def analyze_batch(batch_df: pd.DataFrame, batch_id: int, start_row: int, d
 
     batch_size = len(batch_df)
     concurrency = min(batch_size, res.max_concurrent_requests)   # in caso di pochi alert (es: 3) evito l'apertura di 16 thread (='max_concurrent_requests' attuale)
+    print(f"DEBUG in data - concurrency: {concurrency}")
     semaphore = asyncio.Semaphore(concurrency)
 
     try:

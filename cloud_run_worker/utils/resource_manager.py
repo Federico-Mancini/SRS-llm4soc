@@ -66,6 +66,7 @@ class ResourceManager:
     def reload_config(self):
         conf = json.loads(self._bucket.blob(CONFIG_FILENAME).download_as_text())
         self._max_concurrent_requests = conf.get("max_concurrent_requests", self._max_concurrent_requests)
+        print(f"DEBUG in res manager - new _max_concurrent_requests: {self._max_concurrent_requests}")
 
 
     @property

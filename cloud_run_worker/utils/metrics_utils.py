@@ -20,15 +20,14 @@ def finalize_monitoring(timer_start: float, timestamp_start: float, batch_id: in
     elapsed = time.perf_counter() - timer_start
     ram = get_memory_usage_mb()
 
-    parallelism_used = min(batch_size, concurrency)
     avg_time = elapsed / batch_size if batch_size else 0.0
     alert_throughput = batch_size / elapsed if elapsed else 0
     
     metrics = {
         "batch_id": batch_id,
         "batch_size": batch_size,               # numero alert contenuti in un batch
-        "max_concurrent_reqs": concurrency,     # max numero di thread parallelizzabili con asyncio
-        "parallelism_used": parallelism_used,   # numero di richieste parallele effettivamente inviate a Gemini
+        "max_concurrent_reqs": res.max_concurrent_requests,     # max numero di thread parallelizzabili con asyncio
+        "parallelism_used": concurrency,        # numero di richieste parallele effettivamente inviate a Gemini
         "alert_throughput": alert_throughput,   # numero di alert processati al secondo
         "ram_mb": ram,                          # spazio d'archiviazione usato in RAM durante l'analisi (MB)
         "time_sec": elapsed,                    # tempo impiegato per analizzare il batch (secondi)
