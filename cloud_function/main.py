@@ -1,6 +1,6 @@
 # CRF: Cloud Run Function
 
-import os, posixpath
+import os, time, posixpath
 import utils.gcs_utils as gcs
 
 from google.cloud import storage
@@ -48,7 +48,7 @@ def merge_handler(event, context):
         
         n_blobs = len(res_blobs) + len(met_blobs)
         if n_blobs < expected_batches * 2:
-            res.logger.info(f"[main|F01]\t\t-> Found only {n_blobs}/{expected_batches} batch result files")
+            res.logger.info(f"[main|F01]\t\t-> Found only {n_blobs}/{expected_batches*2} batch result files")
             return
         
         # Acquisizione lock (creazione flag)
@@ -63,6 +63,8 @@ def merge_handler(event, context):
         res.logger.info(f"[main|F01]\t\t-> Saving {n_blobs} batch result files in '{gcs_result_path}'")
         result_data = list(gcs.stream_jsonl_blobs(res_blobs))
         gcs.upload_json(bucket, gcs_result_path, result_data)
+
+        time.sleep(1)
 
         # Unificazione e upload file CSV (batch metrics file)
         res.logger.info(f"[main|F01]\t\t-> Saving {n_blobs} batch metrics files in '{gcs_metrics_path}'")
