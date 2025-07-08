@@ -25,6 +25,8 @@ def create_metadata(dataset_filename: str) -> dict:
     # Estrazione dati da file
     if file_format == '.csv':
         df = pd.read_csv(io.StringIO(data))
+    elif file_format == '.json':
+        df = pd.read_json(io.StringIO(data))
     elif file_format == '.jsonl':
         df = pd.read_json(io.StringIO(data), lines=True)
     else:

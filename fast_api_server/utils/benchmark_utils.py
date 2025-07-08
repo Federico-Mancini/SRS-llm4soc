@@ -1,6 +1,6 @@
 # Benchmark Utils: modulo dedicato alla gestione automatizzata dell'analisi di un dataset, eseguita con parametri dinamici
 
-import os, time, json, threading, shutil, requests
+import os, time, json, shutil, requests
 import utils.gcs_utils as gcs
 import utils.io_utils as iou
 
@@ -167,7 +167,7 @@ async def update_config_json(batch_size, max_reqs):
 
     try:
         # Aggiornamento dati salvati in resource manager locale (VMS) e remoto (CRW)
-        #res.reload_config()    # NB: va considerato che questo codice deve essere importato ed eseguito da benchmark.py, la quale esegue come server su porta e processi diversi, quindi una modifica al manager non si riflette sul manager del server FastAPI
+        #res.reload_config()    # NB: questo modulo è importato e usato da 'benchmark.py', che esegue in qualità di server su porta e processi diversi, quindi una modifica al manager non si riflette sul manager del server principale FastAPI
         requests.get(f"http://localhost:8000/{CONFIG_RELOADING}", timeout=10)
         await call_worker("GET", f"{res.worker_url}/reload-config")
     except Exception as e:

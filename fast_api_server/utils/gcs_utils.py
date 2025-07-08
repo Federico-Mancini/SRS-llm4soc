@@ -1,6 +1,6 @@
 # GCS Utils: modulo per la lettura/scrittura di file remoti e il download/upload
 
-import os, io, time, csv, json, posixpath
+import os, io, time, csv, json, asyncio, posixpath
 
 from fastapi import HTTPException
 from utils.resource_manager import resource_manager as res
@@ -83,13 +83,28 @@ def upload_to(local_path: str, blob_path: str):
 
 
 # F06 - Svuotamento directory remota
-def empty_dir(gcs_dir: str):
-    blobs = res.bucket.list_blobs(prefix=f"{gcs_dir}/")
-    count = 0
-    for blob in blobs:
-        blob.delete()
-        count += 1
-    res.logger.info(f"[gcs|F06]\t\t-> {count} files deleted from '{gcs_dir}/'")
+async def empty_dir(gcs_dir: str):    
+    blobs = list(res.bucket.list_blobs(prefix=f"{gcs_dir}/"))
+    loop = asyncio.get_running_loop()
+    semaphore = asyncio.Semaphore(16)
+
+    async def delete_blob_async(blob, loop, semaphore) -> int:
+        async with semaphore:
+            try:
+                await loop.run_in_executor(None, blob.delete)
+                return 1
+            except Exception as e:
+                res.logger.error(f"[gcs|F06]\t\t-> Error deleting blob '{blob.name}' ({type(e).__name__}): {str(e)}")
+                return 0
+    
+    tasks = [
+        delete_blob_async(blob, loop, semaphore)
+        for blob in blobs
+    ]
+
+    results = await asyncio.gather(*tasks)
+    total_deleted = sum(results)
+    res.logger.info(f"[gcs|F06]\t\t-> {total_deleted} files deleted from '{gcs_dir}/'")
 
 
 # F07 - Scrittura in append di nuova entry sul dataset CSV usato nell'addestrare del Linear Regressor

@@ -187,9 +187,10 @@ async def upload_dataset(file: UploadFile = File(...)):
 async def analyze_dataset(dataset_filename: str = Query(...)):
     try:
         # Pulizia e preparazione
-        gcs.empty_dir(res.gcs_batch_metrics_dir)    # svuotamento directory dei batch metrics file
-        gcs.empty_dir(res.gcs_batch_result_dir)     # svuotamento directory dei batch result file
-        release_merge_lock()                        # uscita del merge handler dalla sospensione delle sue attività (eliminazione flag)
+        await gcs.empty_dir(res.gcs_batch_metrics_dir)  # svuotamento directory dei batch metrics file
+        await gcs.empty_dir(res.gcs_batch_result_dir)   # svuotamento directory dei batch result file
+        release_merge_lock()                            # uscita del merge handler dalla sospensione delle sue attività (eliminazione flag)
+        res.logger.info("[app|E06]\t\t-> Directory emptied and lock released")
 
         # Lettura metadati del dataset
         metadata = download_metadata(dataset_filename)
@@ -200,7 +201,8 @@ async def analyze_dataset(dataset_filename: str = Query(...)):
         metadata["batch_size"] = batch_size
 
         upload_metadata(dataset_filename, metadata) # upload dei nuovi metadati su GCS
-        
+        res.logger.info("[app|E06]\t\t-> Metadata updated and uploaded on GCS")
+
         # Creazione e analisi dei singoli batch tramite Cloud Task
         enqueue_batch_analysis_tasks(metadata)
 
@@ -232,7 +234,7 @@ def get_result(dataset_filename: str = Query(...)):
         raise HTTPException(status_code=500, detail=msg)
 
 
-#
+# (TO DELETE)
 @app.get("/errors")
 def find_errors(dataset_filename: str = Query(...)):
     blob_path = gcs.get_blob_path(res.gcs_result_dir, dataset_filename, "result", "json")
@@ -255,6 +257,7 @@ def find_errors(dataset_filename: str = Query(...)):
 
 # -- ANALISI METRICHE -----------------------------------------------------------------------------
 
+# (TO DELETE)
 # E08 - Visualizzazione metriche dell'ultima analisi effettuata sul dataset specificato (metriche nel JSON, non CSV)
 @app.get("/metrics")
 def get_metrics(dataset_filename: str = Query(...)):
@@ -271,6 +274,7 @@ def get_metrics(dataset_filename: str = Query(...)):
         raise HTTPException(status_code=500, detail=msg)
 
 
+# (TO DELETE)
 # E09 - Analisi metriche dell'ultima analisi effettuata sul dataset specificato (metriche nel JSON, non CSV)
 @app.get("/analyze-metrics")
 def analyze_metrics(dataset_filename: str = Query(...)):
