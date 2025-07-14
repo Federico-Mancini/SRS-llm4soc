@@ -112,16 +112,12 @@ async def run_benchmark(
                 res.logger.info("[benchmark|F01]\t-> Waiting to get all the batch result files")
                 time.sleep(15 if tot_alerts < 500 else 30)
 
-            # Invio richiesta HTTP ad '/analyze-metrics' (OBSOLETE)
-            # res.logger.info(f"[benchmark|F01]\t-> Dataset analysis completed, now sending request to '/{METRICS_ANALYSIS}'")
-            # requests.get(f"http://localhost:8000/{METRICS_ANALYSIS}?dataset_filename={dataset_filename}")
-            # update_benchmark_context(last_request=f"/{METRICS_ANALYSIS}", status="running")
             res.logger.info(f"[benchmark|F01]\t-> Dataset analysis completed. Waiting 30 seconds as inter-analysis buffer")
             update_benchmark_context(status="running")
 
             curr_max_reqs = get_next_val(curr=curr_max_reqs, sup=max_reqs_sup, step=max_reqs_step)
-            if curr_batch_size != revised_batch_size_sup or curr_max_reqs != max_reqs_sup:  # se è l'ultima iterazione, non attendo 1 minuto
-                time.sleep(30)  # apparentemente man mano che si inviano richieste senza sosta, i tempi d'elaborazione si allungano. Una breve pausa intermedia aiuta a tornare in margini accettabili
+            if curr_batch_size != revised_batch_size_sup or curr_max_reqs != max_reqs_sup:  # se è l'ultima iterazione, non attendo
+                time.sleep(30)  # man mano che si inviano richieste senza sosta, i tempi d'elaborazione si allungano. Una breve pausa intermedia aiuta a tornare in margini accettabili
 
         curr_batch_size = get_next_val(curr=curr_batch_size, sup=revised_batch_size_sup, step=batch_size_step)
 

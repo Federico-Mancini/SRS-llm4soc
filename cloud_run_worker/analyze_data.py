@@ -28,7 +28,10 @@ ALERT:
         "event_label": "-"
     }}
 Risposta:
-    {{"class": "false_positive", "explanation": "Aggiornamento del database ClamAV da host interno. Attività pianificata e legittima."}}
+    {{
+        "class": "false_positive",
+        "explanation": "Aggiornamento del database ClamAV da host interno. Attività pianificata e legittima."
+    }}
 
 Ora analizza questo alert:
 ALERT:
