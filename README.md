@@ -1,6 +1,6 @@
 LLM4SOC – False Positive Triage Assistant for IDS Alert Analysis
 
-Sistema AI per classificare alert da IDS (AIT-ADS) come veri positivi o falsi positivi, con spiegazione leggibile tramite LLM (Gemini). Include backend FastAPI, worker su Cloud Run, dashboard React (repo separata) e infrastruttura GCP gestita con Terraform.
+Sistema di classificazione alert da IDS (AIT-ADS) come minacce reali o falsi positivi, con spiegazione leggibile tramite LLM (Gemini). Include server FastAPI, servizi Worker e Merge Handler containerizzati su Cloud Run, dashboard React e infrastruttura GCP gestita con Terraform.
 
 ## Struttura
 .
