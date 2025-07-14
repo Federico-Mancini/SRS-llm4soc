@@ -7,6 +7,7 @@ Sistema di classificazione alert da IDS (AIT-ADS) come minacce reali o falsi pos
 ├── Alerts/                # Dataset CSV/JSON
 ├── cloud_function/        # Merge handler (Cloud Functions)
 ├── cloud_run_worker/      # Worker per analisi LLM (Cloud Run)
+├── docs                   # Documentazione (report e presentazione)
 ├── fast_api_server/       # API FastAPI
 ├── llm4soc/               # Parsing e classificazione alert
 └── README.md
